@@ -1,4 +1,5 @@
 """Config flow for the Autoterm USB integration."""
+
 from __future__ import annotations
 
 import logging
@@ -36,7 +37,7 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 _MANUAL_ENTRY = "__manual__"
-_BY_ID_DIR    = Path("/dev/serial/by-id")
+_BY_ID_DIR = Path("/dev/serial/by-id")
 
 
 def _list_by_id_ports() -> list[tuple[str, str]]:
@@ -48,9 +49,7 @@ def _list_by_id_ports() -> list[tuple[str, str]]:
     if not _BY_ID_DIR.exists():
         return []
     return sorted(
-        (str(_BY_ID_DIR / e.name), e.name)
-        for e in _BY_ID_DIR.iterdir()
-        if e.is_symlink()
+        (str(_BY_ID_DIR / e.name), e.name) for e in _BY_ID_DIR.iterdir() if e.is_symlink()
     )
 
 
@@ -96,9 +95,7 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._ports = await self.hass.async_add_executor_job(_list_by_id_ports)
 
         # Pre-select the FTDI entry if one exists
-        default_port = next(
-            (p for p, _ in self._ports if "FTDI" in p), _MANUAL_ENTRY
-        )
+        default_port = next((p for p, _ in self._ports if "FTDI" in p), _MANUAL_ENTRY)
 
         errors: dict[str, str] = {}
         if user_input is not None:
@@ -109,16 +106,17 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return await self.async_step_settings()
 
         options: list[SelectOptionDict] = [
-            SelectOptionDict(value=p, label=_port_label(p))
-            for p, _ in self._ports
+            SelectOptionDict(value=p, label=_port_label(p)) for p, _ in self._ports
         ]
         options.append(SelectOptionDict(value=_MANUAL_ENTRY, label="Manual entry…"))
 
-        schema = vol.Schema({
-            vol.Required(CONF_PORT, default=default_port): SelectSelector(
-                SelectSelectorConfig(options=options, mode=SelectSelectorMode.LIST)
-            )
-        })
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_PORT, default=default_port): SelectSelector(
+                    SelectSelectorConfig(options=options, mode=SelectSelectorMode.LIST)
+                )
+            }
+        )
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
 
     async def async_step_manual(
@@ -136,14 +134,14 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 self._port = port
                 return await self.async_step_settings()
 
-        schema = vol.Schema({
-            vol.Required(CONF_PORT, default=HINT_PORT): TextSelector(
-                TextSelectorConfig(type=TextSelectorType.TEXT)
-            )
-        })
-        return self.async_show_form(
-            step_id="manual", data_schema=schema, errors=errors
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_PORT, default=HINT_PORT): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.TEXT)
+                )
+            }
         )
+        return self.async_show_form(step_id="manual", data_schema=schema, errors=errors)
 
     async def async_step_settings(
         self, user_input: dict[str, Any] | None = None
@@ -162,22 +160,24 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_PORT: self._port,
                 },
                 options={
-                    CONF_BAUD_RATE:     user_input[CONF_BAUD_RATE],
+                    CONF_BAUD_RATE: user_input[CONF_BAUD_RATE],
                     CONF_POLL_INTERVAL: user_input[CONF_POLL_INTERVAL],
                 },
             )
 
-        schema = vol.Schema({
-            vol.Optional("name", default=DEFAULT_NAME): TextSelector(
-                TextSelectorConfig(type=TextSelectorType.TEXT)
-            ),
-            vol.Required(CONF_BAUD_RATE, default=DEFAULT_BAUD): NumberSelector(
-                NumberSelectorConfig(min=1200, max=115200, step=1, mode=NumberSelectorMode.BOX)
-            ),
-            vol.Required(CONF_POLL_INTERVAL, default=DEFAULT_POLL_INTERVAL): NumberSelector(
-                NumberSelectorConfig(min=2, max=60, step=1, mode=NumberSelectorMode.SLIDER)
-            ),
-        })
+        schema = vol.Schema(
+            {
+                vol.Optional("name", default=DEFAULT_NAME): TextSelector(
+                    TextSelectorConfig(type=TextSelectorType.TEXT)
+                ),
+                vol.Required(CONF_BAUD_RATE, default=DEFAULT_BAUD): NumberSelector(
+                    NumberSelectorConfig(min=1200, max=115200, step=1, mode=NumberSelectorMode.BOX)
+                ),
+                vol.Required(CONF_POLL_INTERVAL, default=DEFAULT_POLL_INTERVAL): NumberSelector(
+                    NumberSelectorConfig(min=2, max=60, step=1, mode=NumberSelectorMode.SLIDER)
+                ),
+            }
+        )
         return self.async_show_form(step_id="settings", data_schema=schema)
 
     @staticmethod
@@ -201,18 +201,20 @@ class AutotermOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
 
-        schema = vol.Schema({
-            vol.Required(
-                CONF_BAUD_RATE,
-                default=opts.get(CONF_BAUD_RATE, DEFAULT_BAUD),
-            ): NumberSelector(
-                NumberSelectorConfig(min=1200, max=115200, step=1, mode=NumberSelectorMode.BOX)
-            ),
-            vol.Required(
-                CONF_POLL_INTERVAL,
-                default=opts.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
-            ): NumberSelector(
-                NumberSelectorConfig(min=2, max=60, step=1, mode=NumberSelectorMode.SLIDER)
-            ),
-        })
+        schema = vol.Schema(
+            {
+                vol.Required(
+                    CONF_BAUD_RATE,
+                    default=opts.get(CONF_BAUD_RATE, DEFAULT_BAUD),
+                ): NumberSelector(
+                    NumberSelectorConfig(min=1200, max=115200, step=1, mode=NumberSelectorMode.BOX)
+                ),
+                vol.Required(
+                    CONF_POLL_INTERVAL,
+                    default=opts.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
+                ): NumberSelector(
+                    NumberSelectorConfig(min=2, max=60, step=1, mode=NumberSelectorMode.SLIDER)
+                ),
+            }
+        )
         return self.async_show_form(step_id="init", data_schema=schema)

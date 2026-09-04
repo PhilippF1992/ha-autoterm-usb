@@ -1,4 +1,5 @@
 """Sensor entities for the Autoterm USB."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -102,10 +103,7 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: AutotermCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        AutotermSensor(coordinator, entry, desc)
-        for desc in SENSOR_DESCRIPTIONS
-    )
+    async_add_entities(AutotermSensor(coordinator, entry, desc) for desc in SENSOR_DESCRIPTIONS)
 
 
 class AutotermSensor(CoordinatorEntity[AutotermCoordinator], SensorEntity):
@@ -119,9 +117,9 @@ class AutotermSensor(CoordinatorEntity[AutotermCoordinator], SensorEntity):
         description: AutotermSensorDescription,
     ) -> None:
         super().__init__(coordinator)
-        self._entry              = entry
-        self.entity_description  = description
-        self._attr_unique_id     = f"{entry.unique_id}_{description.key}"
+        self._entry = entry
+        self.entity_description = description
+        self._attr_unique_id = f"{entry.unique_id}_{description.key}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -131,9 +129,8 @@ class AutotermSensor(CoordinatorEntity[AutotermCoordinator], SensorEntity):
 
     @property
     def available(self) -> bool:
-        return (
-            self.coordinator.last_update_success
-            and self.entity_description.available_fn(self.coordinator.data)
+        return self.coordinator.last_update_success and self.entity_description.available_fn(
+            self.coordinator.data
         )
 
     @property
@@ -156,7 +153,7 @@ class AutotermSensor(CoordinatorEntity[AutotermCoordinator], SensorEntity):
             return {}
         title, detail = FAULT_CODES.get(st.error, ("Unknown fault", ""))
         return {
-            "fault_title":  title,
+            "fault_title": title,
             "fault_detail": detail,
-            "is_lockout":   st.is_lockout,
+            "is_lockout": st.is_lockout,
         }

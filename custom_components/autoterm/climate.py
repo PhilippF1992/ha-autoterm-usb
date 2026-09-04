@@ -1,4 +1,5 @@
 """Climate entity for the Autoterm USB heater."""
+
 from __future__ import annotations
 
 import logging
@@ -25,6 +26,7 @@ from .const import (
     CLIMATE_TEMP_STEP,
     COMMAND_DEBOUNCE,
     DOMAIN,
+    FAULT_RETRYABLE,
     POWER_LEVEL_MAX,
     POWER_LEVEL_MIN,
     START_MODE_BY_POWER,
@@ -42,6 +44,7 @@ _DEFAULT_LEVEL = 9
 # Once mode=0x01 (by-heater-temp) is tested, this mapping can be replaced
 # with a direct setpoint send.
 
+
 def _temp_to_level(temp: float) -> int:
     frac = (temp - CLIMATE_TEMP_MIN) / (CLIMATE_TEMP_MAX - CLIMATE_TEMP_MIN)
     level = round(frac * (POWER_LEVEL_MAX - POWER_LEVEL_MIN)) + POWER_LEVEL_MIN
@@ -49,6 +52,7 @@ def _temp_to_level(temp: float) -> int:
 
 
 # ── hvac_action from HeaterStatus ─────────────────────────────────────────────
+
 
 def _hvac_action(status: HeaterStatus | None) -> HVACAction:
     if status is None:
@@ -68,6 +72,7 @@ def _hvac_action(status: HeaterStatus | None) -> HVACAction:
 
 
 # ── hvac_mode reflected from status ──────────────────────────────────────────
+
 
 def _hvac_mode(status: HeaterStatus | None) -> HVACMode:
     if status is None or status.is_idle:
@@ -89,25 +94,25 @@ async def async_setup_entry(
 class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
     """Climate entity representing the Autoterm USB."""
 
-    _attr_has_entity_name         = True
-    _attr_name                    = None   # device name IS the entity name
-    _attr_hvac_modes              = [HVACMode.OFF, HVACMode.HEAT, HVACMode.FAN_ONLY]
-    _attr_supported_features      = (
+    _attr_has_entity_name = True
+    _attr_name = None  # device name IS the entity name
+    _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT, HVACMode.FAN_ONLY]
+    _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
         | ClimateEntityFeature.TURN_ON
         | ClimateEntityFeature.TURN_OFF
     )
-    _attr_temperature_unit        = UnitOfTemperature.CELSIUS
+    _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = CLIMATE_TEMP_STEP
-    _attr_min_temp                = CLIMATE_TEMP_MIN
-    _attr_max_temp                = CLIMATE_TEMP_MAX
-    _attr_target_temperature      = 20.0   # sane default until user changes it
+    _attr_min_temp = CLIMATE_TEMP_MIN
+    _attr_max_temp = CLIMATE_TEMP_MAX
+    _attr_target_temperature = 20.0  # sane default until user changes it
 
     def __init__(self, coordinator: AutotermCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
-        self._entry          = entry
+        self._entry = entry
         self._attr_unique_id = f"{entry.unique_id}_climate"
-        self._last_command   = 0.0   # monotonic timestamp of last start/stop
+        self._last_command = 0.0  # monotonic timestamp of last start/stop
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -143,11 +148,11 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
         if st is None:
             return {}
         attrs: dict[str, Any] = {
-            "state_name":   st.state_name,
-            "status1":      st.status1,
-            "status2":      st.status2,
-            "error_code":   st.error,
-            "power_level":  _temp_to_level(self._attr_target_temperature or 20.0),
+            "state_name": st.state_name,
+            "status1": st.status1,
+            "status2": st.status2,
+            "error_code": st.error,
+            "power_level": _temp_to_level(self._attr_target_temperature or 20.0),
         }
         if st.is_lockout:
             attrs["lockout"] = True
@@ -161,7 +166,8 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
         if elapsed < COMMAND_DEBOUNCE:
             _LOGGER.warning(
                 "Command ignored — last command was %.1f s ago (debounce=%d s)",
-                elapsed, COMMAND_DEBOUNCE,
+                elapsed,
+                COMMAND_DEBOUNCE,
             )
             return True
         return False
@@ -176,12 +182,13 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
             await self._async_stop()
 
         elif hvac_mode == HVACMode.HEAT:
-            # Do not start if a fault is active — require explicit user action
-            if st and st.is_fault and not st.is_lockout:
+            # Retryable faults (e.g. error 13 = ignition failed) are cleared by
+            # the ECU on the next start attempt — allow the restart through.
+            if st and st.is_fault and st.error not in FAULT_RETRYABLE and not st.is_lockout:
                 _LOGGER.warning(
-                    "Cannot start: active fault code %d (%s). "
-                    "Clear the fault before restarting.",
-                    st.error, st.state_name,
+                    "Cannot start: active fault code %d (%s). Clear the fault before restarting.",
+                    st.error,
+                    st.state_name,
                 )
                 return
             if st and st.is_lockout:

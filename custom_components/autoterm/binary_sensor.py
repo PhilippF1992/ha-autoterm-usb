@@ -1,4 +1,5 @@
 """Binary sensor entities for the Autoterm USB."""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -61,8 +62,7 @@ async def async_setup_entry(
 ) -> None:
     coordinator: AutotermCoordinator = hass.data[DOMAIN][entry.entry_id]
     async_add_entities(
-        AutotermBinarySensor(coordinator, entry, desc)
-        for desc in BINARY_SENSOR_DESCRIPTIONS
+        AutotermBinarySensor(coordinator, entry, desc) for desc in BINARY_SENSOR_DESCRIPTIONS
     )
 
 
@@ -77,9 +77,9 @@ class AutotermBinarySensor(CoordinatorEntity[AutotermCoordinator], BinarySensorE
         description: AutotermBinarySensorDescription,
     ) -> None:
         super().__init__(coordinator)
-        self._entry             = entry
+        self._entry = entry
         self.entity_description = description
-        self._attr_unique_id    = f"{entry.unique_id}_{description.key}"
+        self._attr_unique_id = f"{entry.unique_id}_{description.key}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -89,9 +89,8 @@ class AutotermBinarySensor(CoordinatorEntity[AutotermCoordinator], BinarySensorE
 
     @property
     def available(self) -> bool:
-        return (
-            self.coordinator.last_update_success
-            and self.entity_description.available_fn(self.coordinator.data)
+        return self.coordinator.last_update_success and self.entity_description.available_fn(
+            self.coordinator.data
         )
 
     @property

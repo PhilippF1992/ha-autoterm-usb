@@ -6,6 +6,7 @@ All commands are serialised through an asyncio.Lock.
 No reconnect loop is spawned — callers detect unavailability via None returns
 and let the coordinator mark entities unavailable until the next poll succeeds.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -23,8 +24,8 @@ from .const import DEFAULT_BAUD, START_MODE_BY_POWER
 
 _LOGGER = logging.getLogger(__name__)
 
-_FRAME_TIMEOUT = 3.0    # seconds to wait for a response
-_READ_CHUNK    = 64     # bytes per asyncio read call
+_FRAME_TIMEOUT = 3.0  # seconds to wait for a response
+_READ_CHUNK = 64  # bytes per asyncio read call
 
 
 class AutotermClientError(Exception):
@@ -41,11 +42,11 @@ class AutotermClient:
     """
 
     def __init__(self, port: str, baud: int = DEFAULT_BAUD) -> None:
-        self._port  = port
-        self._baud  = baud
+        self._port = port
+        self._baud = baud
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
-        self._lock   = asyncio.Lock()
+        self._lock = asyncio.Lock()
         self._connected = False
 
     # ── Connection management ─────────────────────────────────────────────────
@@ -56,6 +57,7 @@ class AutotermClient:
             return
         try:
             import serial_asyncio_fast  # noqa: PLC0415  # runtime dep, may not exist at import time
+
             self._reader, self._writer = await serial_asyncio_fast.open_serial_connection(
                 url=self._port,
                 baudrate=self._baud,

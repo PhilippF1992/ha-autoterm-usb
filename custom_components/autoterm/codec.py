@@ -5,6 +5,7 @@ No I/O anywhere in this module. Safe to import in tests and integration alike.
 All confirmed field mappings are from protocol.md (live-captured 2026-09-04).
 Fields marked GUESSED have not been verified against real running data.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ from dataclasses import dataclass
 from .const import CMD_START, CMD_STATUS, CMD_STOP, START_MODE_BY_POWER, STATE_NAMES
 
 # ── CRC-16 / Modbus ───────────────────────────────────────────────────────────
+
 
 def crc16(data: bytes) -> bytes:
     """CRC-16/Modbus — polynomial 0xA001, init 0xFFFF, high byte first."""
@@ -25,20 +27,21 @@ def crc16(data: bytes) -> bytes:
 
 # ── Frame builder ─────────────────────────────────────────────────────────────
 
+
 def build(cmd: int, payload: bytes = b"") -> bytes:
     """Build a controller→heater request frame.
 
     Layout: AA 03 <payload_len> 00 <cmd> [payload…] <CRC_H> <CRC_L>
     """
-    hdr  = bytes([0xAA, 0x03, len(payload), 0x00, cmd])
+    hdr = bytes([0xAA, 0x03, len(payload), 0x00, cmd])
     body = hdr + payload
     return body + crc16(body)
 
 
 # ── Pre-built constant frames (CONFIRMED against real hardware) ───────────────
 
-STATUS_REQ: bytes = build(CMD_STATUS)   # AA 03 00 00 0F 58 7C
-STOP_CMD:   bytes = build(CMD_STOP)     # AA 03 00 00 03 5D 7C
+STATUS_REQ: bytes = build(CMD_STATUS)  # AA 03 00 00 0F 58 7C
+STOP_CMD: bytes = build(CMD_STOP)  # AA 03 00 00 03 5D 7C
 
 
 def build_start(
@@ -57,18 +60,21 @@ def build_start(
     Confirmed working frame for level=9:
       AA 03 06 00 01 FF FF 04 0F 00 09 7F 1F
     """
-    payload = bytes([
-        0xFF,             # reserved
-        0xFF,             # reserved
-        mode  & 0xFF,
-        setpoint & 0xFF,
-        ventilation & 0xFF,
-        level & 0xFF,
-    ])
+    payload = bytes(
+        [
+            0xFF,  # reserved
+            0xFF,  # reserved
+            mode & 0xFF,
+            setpoint & 0xFF,
+            ventilation & 0xFF,
+            level & 0xFF,
+        ]
+    )
     return build(CMD_START, payload)
 
 
 # ── Frame extractor (works on a buffer, no I/O) ───────────────────────────────
+
 
 def read_frame_from_buffer(buf: bytearray) -> tuple[bytes | None, bytearray]:
     """
@@ -83,29 +89,30 @@ def read_frame_from_buffer(buf: bytearray) -> tuple[bytes | None, bytearray]:
             buf.pop(0)
         if len(buf) < 3:
             return None, buf
-        frame_len = 5 + buf[2] + 2    # header(5) + payload + CRC(2)
+        frame_len = 5 + buf[2] + 2  # header(5) + payload + CRC(2)
         if len(buf) < frame_len:
-            return None, buf           # wait for more data
+            return None, buf  # wait for more data
         frame = bytes(buf[:frame_len])
         if crc16(frame[:-2]) == frame[-2:]:
             del buf[:frame_len]
             return frame, buf
-        buf.pop(0)                     # bad CRC → drop preamble, re-sync
+        buf.pop(0)  # bad CRC → drop preamble, re-sync
 
 
 # ── Status payload decoder ────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class HeaterStatus:
     # ── CONFIRMED fields (live-captured, protocol.md) ─────────────────────────
-    status1:     int            # primary state (0=idle,1=starting,2=warmup,3=running,4=shutdown)
-    status2:     int            # sub-state
-    state_name:  str            # human-readable from STATE_NAMES
-    error:       int            # fault code byte; 0 = no fault
-    heater_temp: int            # °C — internal ambient sensor near heater
-    ext_temp:    int | None  # °C; None when byte is 0x7F (no sensor fitted)
-    voltage:     float          # supply voltage V (raw byte / 10)
-    flame_k:     int            # heat-exchanger temp in Kelvin (big-endian 2-byte)
+    status1: int  # primary state (0=idle,1=starting,2=warmup,3=running,4=shutdown)
+    status2: int  # sub-state
+    state_name: str  # human-readable from STATE_NAMES
+    error: int  # fault code byte; 0 = no fault
+    heater_temp: int  # °C — internal ambient sensor near heater
+    ext_temp: int | None  # °C; None when byte is 0x7F (no sensor fitted)
+    voltage: float  # supply voltage V (raw byte / 10)
+    flame_k: int  # heat-exchanger temp in Kelvin (big-endian 2-byte)
     # payload_len preserved for diagnostics / future field mapping
     raw_payload: bytes
 
@@ -167,21 +174,21 @@ def parse_status(frame: bytes) -> HeaterStatus | None:
     # Must be heater→controller response (type 0x04) to STATUS cmd (0x0F)
     if frame[1] != 0x04 or frame[4] != 0x0F:
         return None
-    p = frame[5: 5 + frame[2]]
+    p = frame[5 : 5 + frame[2]]
     if len(p) < _MIN_PAYLOAD:
         return None
 
     s1, s2 = p[0], p[1]
     return HeaterStatus(
-        status1    = s1,
-        status2    = s2,
-        state_name = STATE_NAMES.get((s1, s2), f"{s1}.{s2}"),
-        error      = p[2],
-        heater_temp= p[3],
-        ext_temp   = None if p[4] == 0x7F else p[4],
+        status1=s1,
+        status2=s2,
+        state_name=STATE_NAMES.get((s1, s2), f"{s1}.{s2}"),
+        error=p[2],
+        heater_temp=p[3],
+        ext_temp=None if p[4] == 0x7F else p[4],
         # p[5] = unknown (always 0x00 observed) — excluded from public fields
-        voltage    = p[6] / 10.0,
-        flame_k    = p[7] * 256 + p[8],
+        voltage=p[6] / 10.0,
+        flame_k=p[7] * 256 + p[8],
         # p[9] = GUESSED activity byte (0x00 idle, 0x01 starting, 0x05 fault)
-        raw_payload= bytes(p),
+        raw_payload=bytes(p),
     )

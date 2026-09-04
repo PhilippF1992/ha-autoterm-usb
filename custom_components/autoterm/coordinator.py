@@ -1,4 +1,5 @@
 """DataUpdateCoordinator for the Autoterm USB."""
+
 from __future__ import annotations
 
 import logging

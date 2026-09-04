@@ -1,4 +1,5 @@
 """Autoterm USB custom integration."""
+
 from __future__ import annotations
 
 import logging
@@ -29,8 +30,8 @@ PLATFORMS: list[Platform] = [
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    port          = entry.data[CONF_PORT]
-    baud          = entry.options.get(CONF_BAUD_RATE, DEFAULT_BAUD)
+    port = entry.data[CONF_PORT]
+    baud = entry.options.get(CONF_BAUD_RATE, DEFAULT_BAUD)
     poll_interval = entry.options.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL)
 
     client = AutotermClient(port=port, baud=int(baud))
