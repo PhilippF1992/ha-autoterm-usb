@@ -1,0 +1,46 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Select Serial Port",
+        "description": "Choose the USB serial adapter connected to the Autoterm heater. The FTDI FT232R entry (from the VAN PI adapter) will be pre-selected if present.",
+        "data": {
+          "port": "Serial port"
+        }
+      },
+      "manual": {
+        "title": "Manual Port Entry",
+        "description": "Enter the full path to the serial device. Use the stable /dev/serial/by-id/... form, not /dev/ttyUSBx.",
+        "data": {
+          "port": "Device path"
+        }
+      },
+      "settings": {
+        "title": "Connection Settings",
+        "data": {
+          "name": "Name",
+          "baud_rate": "Baud rate (confirmed: 2400)",
+          "poll_interval": "Poll interval (seconds)"
+        }
+      }
+    },
+    "error": {
+      "port_required": "Device path is required.",
+      "port_not_found": "Device path does not exist. Ensure the adapter is connected."
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Autoterm Options",
+        "data": {
+          "baud_rate": "Baud rate",
+          "poll_interval": "Poll interval (seconds)"
+        }
+      }
+    }
+  }
+}
