@@ -35,10 +35,11 @@ _stub("homeassistant.exceptions", ConfigEntryNotReady=Exception)
 _stub("homeassistant.util")
 import datetime as _datetime
 
+
 class _FakeDtUtil:
     @staticmethod
     def utcnow():
-        return _datetime.datetime.now(_datetime.timezone.utc)
+        return _datetime.datetime.now(_datetime.UTC)
 
 _stub("homeassistant.util.dt", utcnow=_FakeDtUtil.utcnow)
 

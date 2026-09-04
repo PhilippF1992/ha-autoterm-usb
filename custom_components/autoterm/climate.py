@@ -28,8 +28,6 @@ from .const import (
     CONF_TEMP_SOURCE_ENTITY,
     DOMAIN,
     FAULT_RETRYABLE,
-    POWER_LEVEL_MAX,
-    POWER_LEVEL_MIN,
     REG_SOURCE_PANEL,
     REG_SOURCE_POWER,
     REG_SOURCE_TO_MODE,
@@ -209,11 +207,14 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
         self.async_write_ha_state()
 
         st = self.coordinator.data
-        if st and (st.is_running or st.is_starting):
-            # Live setpoint update via 0x11 — does not require a full restart.
-            # In panel mode the coordinator loop feeds temp, so only send in
-            # non-panel temperature modes and power mode.
-            if self.coordinator.reg_source != REG_SOURCE_PANEL and not self._debounced():
+        # Live setpoint update via 0x11 — no restart needed.
+        # Skip in panel mode; the coordinator loop feeds the measured temp instead.
+        if (
+            st
+            and (st.is_running or st.is_starting)
+            and self.coordinator.reg_source != REG_SOURCE_PANEL
+            and not self._debounced()
+        ):
                 ok = await self.coordinator.client.send_set_temp(int(round(temp)))
                 self._last_command = time.monotonic()
                 if not ok:

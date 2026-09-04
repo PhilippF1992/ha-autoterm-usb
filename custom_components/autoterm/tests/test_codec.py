@@ -321,7 +321,7 @@ GET_SETTINGS_REQ_HEX = "aa030000029dbd"
 
 def test_constant_get_settings_req():
     """GET_SETTINGS_REQ must match protocol.md: AA 03 00 00 02 9D BD."""
-    assert GET_SETTINGS_REQ == bytes.fromhex(GET_SETTINGS_REQ_HEX)
+    assert bytes.fromhex(GET_SETTINGS_REQ_HEX) == GET_SETTINGS_REQ
 
 
 def test_get_settings_req_crc_valid():

@@ -12,8 +12,6 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
-    DEFAULT_FAN_LEVEL,
-    DEFAULT_POWER_LEVEL,
     DOMAIN,
     POWER_LEVEL_MAX,
     POWER_LEVEL_MIN,

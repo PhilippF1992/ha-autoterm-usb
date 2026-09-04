@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import time
+from datetime import timedelta
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
@@ -13,6 +15,8 @@ from homeassistant.util import dt as dt_util
 from .client import AutotermClient, AutotermClientError
 from .codec import HeaterStatus, SettingsPayload
 from .const import (
+    CLIMATE_TEMP_MAX,
+    CLIMATE_TEMP_MIN,
     CONF_STALENESS_THRESHOLD,
     CONF_TEMP_SOURCE_ENTITY,
     DEFAULT_FAN_LEVEL,
@@ -22,16 +26,12 @@ from .const import (
     MODE_TO_REG_SOURCE,
     PANEL_TEMP_MAX,
     PANEL_TEMP_MIN,
-    REG_SOURCE_INTERNAL,
     REG_SOURCE_PANEL,
     REG_SOURCE_POWER,
     REG_SOURCE_TO_MODE,
     SETTINGS_READ_INTERVAL,
     START_MODE_BY_HEATER_TEMP,
-    CLIMATE_TEMP_MIN,
-    CLIMATE_TEMP_MAX,
 )
-from datetime import timedelta
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -113,10 +113,8 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
 
         # Periodic settings re-read to stay in sync with heater-side changes
         if time.monotonic() - self._last_settings_poll > SETTINGS_READ_INTERVAL:
-            try:
+            with contextlib.suppress(Exception):
                 await self.async_refresh_settings()
-            except Exception:
-                pass  # don't fail the poll just because settings refresh failed
 
         return status
 
