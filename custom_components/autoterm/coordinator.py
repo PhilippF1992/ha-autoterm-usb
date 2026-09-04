@@ -76,6 +76,7 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
         self._settings: SettingsPayload | None = None
         self._last_settings_poll: float = 0.0          # monotonic
         self._panel_fallback_active: bool = False
+        self._consecutive_poll_failures: int = 0
 
     # ── Settings sync ─────────────────────────────────────────────────────────
 
@@ -96,6 +97,12 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
 
     # ── DataUpdateCoordinator override ───────────────────────────────────────
 
+    # How many consecutive missed STATUS responses before declaring unavailable.
+    # A command (START/STOP) holds the lock for ~1 s and the heater may not reply
+    # to the immediate post-command refresh poll — tolerate a few misses so that
+    # entities don't flicker unavailable on every command.
+    _MAX_POLL_FAILURES = 3
+
     async def _async_update_data(self) -> HeaterStatus | None:
         if not await self.client.ensure_connected():
             raise UpdateFailed("Cannot connect to heater serial port")
@@ -108,8 +115,22 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
             status = await self.client.poll_status()
         except AutotermClientError as exc:
             raise UpdateFailed(str(exc)) from exc
+
         if status is None:
-            raise UpdateFailed("No STATUS response from heater")
+            self._consecutive_poll_failures += 1
+            if self._consecutive_poll_failures >= self._MAX_POLL_FAILURES:
+                raise UpdateFailed(
+                    f"No STATUS response from heater "
+                    f"({self._consecutive_poll_failures} consecutive misses)"
+                )
+            _LOGGER.debug(
+                "No STATUS response (miss %d/%d) — keeping last state",
+                self._consecutive_poll_failures,
+                self._MAX_POLL_FAILURES,
+            )
+            return self.data  # return last known data; entities stay available
+
+        self._consecutive_poll_failures = 0
 
         # Periodic settings re-read to stay in sync with heater-side changes
         if time.monotonic() - self._last_settings_poll > SETTINGS_READ_INTERVAL:
