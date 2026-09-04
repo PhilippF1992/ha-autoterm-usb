@@ -1,0 +1,141 @@
+# Autoterm USB — Home Assistant custom integration
+
+Third-party custom integration for **Autoterm** (formerly Planar) diesel air heaters,
+connected to Home Assistant via a **VAN PI USB adapter** (FTDI FT232R).
+
+> This is **not** an official Autoterm integration and **not** an official Home
+> Assistant integration.
+
+## Scope
+
+- **Transport:** FTDI FT232R USB-to-UART adapter (VAN PI) at **2400 baud 8N1** — confirmed on Air 4D.
+- **Protocol:** Autoterm proprietary poll-response serial protocol. All frames confirmed on real hardware.
+- **Heater:** Autoterm Air 4D (Planar 44D). Other Autoterm/Planar variants may work but are untested.
+- **Home Assistant OS:** current stable Core / HAOS. Installs under `/config/custom_components/autoterm/`.
+- **Not supported:** Wi-Fi/Bluetooth panels, OEM control panels, RS232 adapters other than the VAN PI.
+
+## Hardware warning
+
+> There are multiple USB-serial devices on a typical camper van Pi setup (Daly BMS, Victron MK3, etc.).
+> The integration uses the stable `/dev/serial/by-id/...` path to identify the correct adapter.
+> Never use `/dev/ttyUSBx` — the index changes on reboot.
+
+**Never stop the heater by cutting power or closing the serial port.** The heater requires a full
+purge/cooldown cycle. Always use the proper STOP command and keep the heater powered until it
+reports idle. The integration enforces this — closing the entry cleanly sends STOP and waits.
+
+## Installation
+
+### HACS
+
+1. In HACS → Integrations → **⋮** → **Custom repositories**, add
+   `https://github.com/PhilippF1992/ha-autoterm-usb` with category **Integration**.
+2. Install **Autoterm USB**.
+3. Restart Home Assistant.
+4. Go to **Settings → Devices & services → Add integration**, search for *Autoterm USB*.
+
+### Manual
+
+1. Copy `custom_components/autoterm/` into `/config/custom_components/`.
+2. Restart Home Assistant.
+3. Add via **Settings → Devices & services → Add integration → Autoterm USB**.
+
+## Connecting the hardware
+
+1. Connect the VAN PI USB adapter to the heater's 4-pin JST connector and to the Raspberry Pi.
+2. In Home Assistant, check **Settings → System → Hardware → All Hardware** — look for a
+   `/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_*` entry.
+3. Only one process may hold the port. Stop any other scripts (e.g. `heat_run.py`) before setup.
+
+## Setting up the integration
+
+The setup wizard asks for:
+
+- **Serial port** — dropdown of `/dev/serial/by-id/...` entries. The FTDI FT232R (VAN PI) entry
+  is pre-selected. Use **Manual entry** if the device isn't listed.
+- **Baud rate** — default **2400** (confirmed). Change only if your unit requires a different rate.
+- **Poll interval** — default **5 s**. The heater is polled synchronously; do not go below 2 s.
+- **Friendly name** — displayed in the HA UI.
+
+### Options flow
+
+**Settings → Devices & services → Autoterm USB → Configure** lets you change the baud rate
+and poll interval without removing the entry.
+
+## Entities
+
+All entities belong to a single device per heater.
+
+**Climate:**
+
+- `climate.autoterm_usb` — the main control entity.
+  - Modes: **Off** (sends STOP), **Heat** (sends START at mapped power level), **Ventilate** (TODO — not yet confirmed).
+  - Target temperature 0–30 °C, step 1 °C, mapped linearly to power levels 1–9.
+  - Current temperature reflects the internal heater sensor.
+
+**Sensors:**
+
+| Entity | Description |
+|---|---|
+| Internal Temperature | Ambient temperature near the heater body (°C) |
+| External Temperature | Optional external sensor (°C); unavailable if no sensor fitted |
+| Supply Voltage | Battery/supply voltage at the heater connector (V) |
+| Heat Exchanger Temperature | Flame/heat-exchanger temperature (°C) |
+| State | Human-readable state name (idle, warmup, running, shutdown, …) |
+| Fault Code | Numeric fault code (0 = no fault) |
+| Fault Description | Text description from the Autoterm fault code table |
+
+**Binary sensors:**
+
+| Entity | Description |
+|---|---|
+| Running | True while status1 = 3 (actively heating) |
+| Fault | True when any non-zero fault code is present |
+| Lockout | True on fault code 33 — requires manual unlock procedure |
+| External Temperature Sensor | True when an external sensor is fitted and responding |
+
+## Safety behaviour
+
+- **No auto-restart on fault.** If a fault code is present, the integration exposes it and
+  requires explicit user action to start again.
+- **Lockout (code 33)** is surfaced as a distinct binary sensor. A normal start command will not
+  clear it — the manual unlock procedure in the Autoterm installation manual must be followed.
+- **Debounce:** start and stop commands are rate-limited (5 s minimum between commands).
+- **CRC validation:** every received frame is CRC-checked before any action is taken.
+- **Purge/cooldown:** setting mode to OFF sends STOP and keeps polling until the heater reports
+  idle. The port is never closed early.
+
+## Troubleshooting
+
+- **Port not found** — check Hardware panel for the actual by-id path, then re-run the setup wizard.
+- **No response / timeout** — confirm 2400 baud; another process may be holding the port.
+- **Error code 13** on first cold start — normal. Fuel hasn't reached the burner yet; retry succeeds
+  once the fuel line is primed (see Autoterm installation manual).
+- **Error code 33 (Lockout)** — repeated ignition failures trigger a lockout. Follow the manual
+  unlock procedure before attempting to start again.
+
+## Enable debug logging
+
+```yaml
+logger:
+  logs:
+    custom_components.autoterm: debug
+```
+
+## Confirmed protocol
+
+All frames confirmed on real hardware (Autoterm Air 4D, 2026):
+
+| Command | Frame | Status |
+|---|---|---|
+| STATUS (poll) | `AA 03 00 00 0F 58 7C` | ✅ Confirmed |
+| STOP | `AA 03 00 00 03 5D 7C` | ✅ Confirmed |
+| START level 9 | `AA 03 06 00 01 FF FF 04 0F 00 09 7F 1F` | ✅ Confirmed |
+| FAN ONLY | — | ⚠️ Not yet confirmed |
+
+See `protocol.md` for the full frame specification and field map.
+
+## Removing the integration
+
+**Settings → Devices & services → Autoterm USB → ⋮ → Delete**. This sends STOP, waits for
+cooldown to complete, then closes the serial port and removes all entities.

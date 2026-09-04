@@ -1,11 +1,12 @@
 {
   "domain": "autoterm",
   "name": "Autoterm USB",
-  "codeowners": ["@placeholder"],
+  "codeowners": ["@PhilippF1992"],
   "config_flow": true,
-  "documentation": "",
+  "documentation": "https://github.com/PhilippF1992/ha-autoterm-usb",
   "integration_type": "device",
   "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/PhilippF1992/ha-autoterm-usb/issues",
   "requirements": ["pyserial-asyncio-fast>=0.11"],
   "version": "0.1.0"
 }

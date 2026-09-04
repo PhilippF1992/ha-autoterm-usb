@@ -41,7 +41,7 @@ POWER_LEVEL_MIN = 1
 POWER_LEVEL_MAX = 9
 
 # Conservative climate target-temperature range (°C)
-CLIMATE_TEMP_MIN  = 8.0
+CLIMATE_TEMP_MIN  = 0.0
 CLIMATE_TEMP_MAX  = 30.0
 CLIMATE_TEMP_STEP = 1.0
 
