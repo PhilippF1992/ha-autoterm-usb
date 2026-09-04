@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Optional
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -15,7 +14,7 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
-class AutotermCoordinator(DataUpdateCoordinator[Optional[HeaterStatus]]):
+class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
     """
     Polls the heater on a fixed interval.
 
@@ -38,7 +37,7 @@ class AutotermCoordinator(DataUpdateCoordinator[Optional[HeaterStatus]]):
         )
         self.client = client
 
-    async def _async_update_data(self) -> Optional[HeaterStatus]:
+    async def _async_update_data(self) -> HeaterStatus | None:
         if not await self.client.ensure_connected():
             raise UpdateFailed("Cannot connect to heater serial port")
         try:

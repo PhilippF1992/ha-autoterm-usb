@@ -9,9 +9,7 @@ from __future__ import annotations
 import pytest
 
 # Stubs and sys.path are set up by the root conftest.py before collection.
-
 from custom_components.autoterm.codec import (
-    HeaterStatus,
     STATUS_REQ,
     STOP_CMD,
     build,
@@ -74,11 +72,11 @@ def test_crc16_idle_response():
 # ── build() / constant frame tests ────────────────────────────────────────────
 
 def test_constant_status_req():
-    assert STATUS_REQ == bytes.fromhex(STATUS_REQ_HEX)
+    assert bytes.fromhex(STATUS_REQ_HEX) == STATUS_REQ
 
 
 def test_constant_stop_cmd():
-    assert STOP_CMD == bytes.fromhex(STOP_CMD_HEX)
+    assert bytes.fromhex(STOP_CMD_HEX) == STOP_CMD
 
 
 def test_build_start_l9():

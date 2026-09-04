@@ -8,10 +8,8 @@ Fields marked GUESSED have not been verified against real running data.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
-from .const import CMD_STATUS, CMD_STOP, CMD_START, STATE_NAMES, START_MODE_BY_POWER
-
+from .const import CMD_START, CMD_STATUS, CMD_STOP, START_MODE_BY_POWER, STATE_NAMES
 
 # ── CRC-16 / Modbus ───────────────────────────────────────────────────────────
 
@@ -72,7 +70,7 @@ def build_start(
 
 # ── Frame extractor (works on a buffer, no I/O) ───────────────────────────────
 
-def read_frame_from_buffer(buf: bytearray) -> tuple[Optional[bytes], bytearray]:
+def read_frame_from_buffer(buf: bytearray) -> tuple[bytes | None, bytearray]:
     """
     Extract the first CRC-valid frame from a bytearray buffer.
 
@@ -100,12 +98,12 @@ def read_frame_from_buffer(buf: bytearray) -> tuple[Optional[bytes], bytearray]:
 @dataclass(frozen=True)
 class HeaterStatus:
     # ── CONFIRMED fields (live-captured, protocol.md) ─────────────────────────
-    status1:     int            # primary state (0=idle, 1=starting, 2=warmup, 3=running, 4=shutdown)
+    status1:     int            # primary state (0=idle,1=starting,2=warmup,3=running,4=shutdown)
     status2:     int            # sub-state
     state_name:  str            # human-readable from STATE_NAMES
     error:       int            # fault code byte; 0 = no fault
     heater_temp: int            # °C — internal ambient sensor near heater
-    ext_temp:    Optional[int]  # °C; None when byte is 0x7F (no sensor fitted)
+    ext_temp:    int | None  # °C; None when byte is 0x7F (no sensor fitted)
     voltage:     float          # supply voltage V (raw byte / 10)
     flame_k:     int            # heat-exchanger temp in Kelvin (big-endian 2-byte)
     # payload_len preserved for diagnostics / future field mapping
@@ -154,7 +152,7 @@ class HeaterStatus:
 _MIN_PAYLOAD = 9
 
 
-def parse_status(frame: bytes) -> Optional[HeaterStatus]:
+def parse_status(frame: bytes) -> HeaterStatus | None:
     """
     Decode a STATUS (0x0F) response frame into a HeaterStatus.
 

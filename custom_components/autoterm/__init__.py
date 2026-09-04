@@ -9,7 +9,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 
 from .client import AutotermClient, AutotermClientError
-from .const import CONF_BAUD_RATE, CONF_POLL_INTERVAL, CONF_PORT, DEFAULT_BAUD, DEFAULT_POLL_INTERVAL, DOMAIN
+from .const import (
+    CONF_BAUD_RATE,
+    CONF_POLL_INTERVAL,
+    CONF_PORT,
+    DEFAULT_BAUD,
+    DEFAULT_POLL_INTERVAL,
+    DOMAIN,
+)
 from .coordinator import AutotermCoordinator
 
 _LOGGER = logging.getLogger(__name__)

@@ -1,8 +1,9 @@
 """Sensor entities for the Autoterm USB."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -28,7 +29,7 @@ from .coordinator import AutotermCoordinator
 @dataclass(frozen=True)
 class AutotermSensorDescription(SensorEntityDescription):
     value_fn: Callable[[HeaterStatus], Any] = lambda _: None
-    available_fn: Callable[[Optional[HeaterStatus]], bool] = lambda st: st is not None
+    available_fn: Callable[[HeaterStatus | None], bool] = lambda st: st is not None
 
 
 SENSOR_DESCRIPTIONS: tuple[AutotermSensorDescription, ...] = (

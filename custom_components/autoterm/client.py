@@ -10,12 +10,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Optional
 
 from .codec import (
-    HeaterStatus,
     STATUS_REQ,
     STOP_CMD,
+    HeaterStatus,
     build_start,
     parse_status,
     read_frame_from_buffer,
@@ -44,8 +43,8 @@ class AutotermClient:
     def __init__(self, port: str, baud: int = DEFAULT_BAUD) -> None:
         self._port  = port
         self._baud  = baud
-        self._reader: Optional[asyncio.StreamReader] = None
-        self._writer: Optional[asyncio.StreamWriter] = None
+        self._reader: asyncio.StreamReader | None = None
+        self._writer: asyncio.StreamWriter | None = None
         self._lock   = asyncio.Lock()
         self._connected = False
 
@@ -56,7 +55,7 @@ class AutotermClient:
         if self._connected:
             return
         try:
-            import serial_asyncio_fast  # loaded at runtime, in requirements
+            import serial_asyncio_fast  # noqa: PLC0415  # runtime dep, may not exist at import time
             self._reader, self._writer = await serial_asyncio_fast.open_serial_connection(
                 url=self._port,
                 baudrate=self._baud,
@@ -100,7 +99,7 @@ class AutotermClient:
 
     # ── Low-level I/O ─────────────────────────────────────────────────────────
 
-    async def _read_frame(self, timeout: float = _FRAME_TIMEOUT) -> Optional[bytes]:
+    async def _read_frame(self, timeout: float = _FRAME_TIMEOUT) -> bytes | None:
         """
         Read bytes from the serial port until a CRC-valid frame is assembled.
 
@@ -127,7 +126,7 @@ class AutotermClient:
             self._connected = False
             return None
 
-    async def _transact(self, cmd: bytes, timeout: float = _FRAME_TIMEOUT) -> Optional[bytes]:
+    async def _transact(self, cmd: bytes, timeout: float = _FRAME_TIMEOUT) -> bytes | None:
         """
         Send a command and return the first valid response frame.
         Must be called with self._lock already held.
@@ -144,14 +143,14 @@ class AutotermClient:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    async def transact(self, cmd: bytes, timeout: float = _FRAME_TIMEOUT) -> Optional[bytes]:
+    async def transact(self, cmd: bytes, timeout: float = _FRAME_TIMEOUT) -> bytes | None:
         """Serialised command+response — safe to call from multiple coroutines."""
         async with self._lock:
             if not self._connected:
                 return None
             return await self._transact(cmd, timeout)
 
-    async def poll_status(self) -> Optional[HeaterStatus]:
+    async def poll_status(self) -> HeaterStatus | None:
         """Send STATUS poll and return decoded HeaterStatus, or None."""
         frame = await self.transact(STATUS_REQ, timeout=_FRAME_TIMEOUT)
         if frame is None:

@@ -58,15 +58,6 @@
       "fault":             { "name": "Fault" },
       "ext_sensor_present":{ "name": "External Temperature Sensor" },
       "lockout":           { "name": "Lockout" }
-    },
-    "climate": {
-      "state": {
-        "hvac_mode": {
-          "off":      "Off",
-          "heat":     "Heat",
-          "fan_only": "Ventilate (not yet confirmed)"
-        }
-      }
     }
   }
 }

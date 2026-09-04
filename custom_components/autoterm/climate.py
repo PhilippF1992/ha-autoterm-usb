@@ -224,7 +224,8 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
 
     async def _async_start(self) -> None:
         level = _temp_to_level(self._attr_target_temperature or 20.0)
-        _LOGGER.info("Sending START at power level %d (target=%.0f°C)", level, self._attr_target_temperature or 20.0)
+        target = self._attr_target_temperature or 20.0
+        _LOGGER.info("Sending START at power level %d (target=%.0f°C)", level, target)
         ok = await self.coordinator.client.send_start(level=level, mode=START_MODE_BY_POWER)
         self._last_command = time.monotonic()
         if not ok:
