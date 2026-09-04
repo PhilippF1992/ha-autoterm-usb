@@ -38,12 +38,21 @@
         "title": "Autoterm Options",
         "data": {
           "baud_rate": "Baud rate",
-          "poll_interval": "Poll interval (seconds)"
+          "poll_interval": "Poll interval (seconds)",
+          "temp_source_entity": "Room temperature sensor (for Panel mode)",
+          "staleness_threshold": "Sensor staleness threshold (seconds)"
+        },
+        "data_description": {
+          "temp_source_entity": "HA sensor entity (e.g. DS18B20) whose value is fed to the heater every poll cycle when regulation mode is 'Panel (HA-fed)'. If unavailable or stale the integration falls back to the internal sensor.",
+          "staleness_threshold": "If the selected sensor has not updated in this many seconds it is treated as stale and the integration falls back to the internal heater sensor."
         }
       }
     }
   },
   "entity": {
+    "climate": {
+      "autoterm_climate": { "name": "Heater" }
+    },
     "sensor": {
       "heater_temp":       { "name": "Internal Temperature" },
       "ext_temp":          { "name": "External Temperature" },
@@ -54,10 +63,25 @@
       "fault_description": { "name": "Fault Description" }
     },
     "binary_sensor": {
-      "running":           { "name": "Running" },
-      "fault":             { "name": "Fault" },
-      "ext_sensor_present":{ "name": "External Temperature Sensor" },
-      "lockout":           { "name": "Lockout" }
+      "running":            { "name": "Running" },
+      "fault":              { "name": "Fault" },
+      "ext_sensor_present": { "name": "External Temperature Sensor" },
+      "lockout":            { "name": "Lockout" }
+    },
+    "select": {
+      "reg_source": {
+        "name": "Regulate by",
+        "state": {
+          "internal": "Internal sensor",
+          "panel":    "Panel (HA-fed)",
+          "external": "External sensor",
+          "power":    "Power level"
+        }
+      }
+    },
+    "number": {
+      "power_level": { "name": "Power Level" },
+      "fan_level":   { "name": "Fan Speed" }
     }
   }
 }

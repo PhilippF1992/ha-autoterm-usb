@@ -11,6 +11,8 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers.selector import (
+    EntitySelector,
+    EntitySelectorConfig,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -27,9 +29,12 @@ from .const import (
     CONF_BAUD_RATE,
     CONF_POLL_INTERVAL,
     CONF_PORT,
+    CONF_STALENESS_THRESHOLD,
+    CONF_TEMP_SOURCE_ENTITY,
     DEFAULT_BAUD,
     DEFAULT_NAME,
     DEFAULT_POLL_INTERVAL,
+    DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
     HINT_PORT,
 )
@@ -189,7 +194,7 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class AutotermOptionsFlow(config_entries.OptionsFlow):
-    """Allow baud rate and poll interval to be changed post-setup."""
+    """Allow baud rate, poll interval, source entity and staleness threshold to be changed."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
@@ -199,22 +204,37 @@ class AutotermOptionsFlow(config_entries.OptionsFlow):
     ) -> config_entries.FlowResult:
         opts = self._config_entry.options
         if user_input is not None:
+            # Strip empty string for optional entity selector
+            if not user_input.get(CONF_TEMP_SOURCE_ENTITY):
+                user_input.pop(CONF_TEMP_SOURCE_ENTITY, None)
             return self.async_create_entry(title="", data=user_input)
 
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_BAUD_RATE,
-                    default=opts.get(CONF_BAUD_RATE, DEFAULT_BAUD),
-                ): NumberSelector(
-                    NumberSelectorConfig(min=1200, max=115200, step=1, mode=NumberSelectorMode.BOX)
-                ),
-                vol.Required(
-                    CONF_POLL_INTERVAL,
-                    default=opts.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
-                ): NumberSelector(
-                    NumberSelectorConfig(min=2, max=60, step=1, mode=NumberSelectorMode.SLIDER)
-                ),
-            }
-        )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        current_source = opts.get(CONF_TEMP_SOURCE_ENTITY)
+
+        schema_dict: dict = {
+            vol.Required(
+                CONF_BAUD_RATE,
+                default=opts.get(CONF_BAUD_RATE, DEFAULT_BAUD),
+            ): NumberSelector(
+                NumberSelectorConfig(min=1200, max=115200, step=1, mode=NumberSelectorMode.BOX)
+            ),
+            vol.Required(
+                CONF_POLL_INTERVAL,
+                default=opts.get(CONF_POLL_INTERVAL, DEFAULT_POLL_INTERVAL),
+            ): NumberSelector(
+                NumberSelectorConfig(min=2, max=60, step=1, mode=NumberSelectorMode.SLIDER)
+            ),
+            vol.Optional(
+                CONF_TEMP_SOURCE_ENTITY,
+                description={"suggested_value": current_source},
+            ): EntitySelector(
+                EntitySelectorConfig(domain="sensor")
+            ),
+            vol.Optional(
+                CONF_STALENESS_THRESHOLD,
+                default=opts.get(CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD),
+            ): NumberSelector(
+                NumberSelectorConfig(min=30, max=600, step=10, mode=NumberSelectorMode.SLIDER)
+            ),
+        }
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema_dict))

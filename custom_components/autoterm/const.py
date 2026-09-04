@@ -9,12 +9,17 @@ DOMAIN = "autoterm"
 CONF_PORT = "port"
 CONF_BAUD_RATE = "baud_rate"
 CONF_POLL_INTERVAL = "poll_interval"
+CONF_TEMP_SOURCE_ENTITY = "temp_source_entity"
+CONF_STALENESS_THRESHOLD = "staleness_threshold"
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
 
 DEFAULT_BAUD = 2400  # CONFIRMED on real hardware
 DEFAULT_POLL_INTERVAL = 5  # seconds
 DEFAULT_NAME = "Autoterm USB"
+DEFAULT_POWER_LEVEL = 5
+DEFAULT_FAN_LEVEL = 5
+DEFAULT_STALENESS_THRESHOLD = 120  # seconds before panel sensor feed is considered stale
 
 # Stable by-id path hint shown as default in config flow
 HINT_PORT = "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_ABAKLQ9A-if00-port0"
@@ -26,28 +31,62 @@ CMD_STOP = 0x03
 CMD_START = 0x01
 CMD_GET_SETTINGS = 0x02
 CMD_GET_VERSION = 0x06
+# CONFIRMED: 1-byte payload = temperature in °C. Used for setpoint AND panel temp feed.
+# Source: task spec + prclm/AutotermHeaterController + k3mpaxl/pekaway-ha-autoterm
+CMD_SET_TEMP = 0x11
+# FAN/VENTILATE only — PORTED from prclm (4D/44D) and k3mpaxl (2D). NOT confirmed on real hardware.
+# k3mpaxl payload last byte = 0xFF; prclm (4D/44D) = 0x0F. We follow prclm as 4D-specific.
+CMD_FAN_ONLY = 0x23
 
-# ── START frame: mode byte ────────────────────────────────────────────────────
+# ── START/SETTINGS frame: mode byte ──────────────────────────────────────────
 
-START_MODE_BY_HEATER_TEMP = 0x01  # temperature-controlled (not yet confirmed)
-START_MODE_BY_CONTROLLER_TEMP = 0x02  # not confirmed
-START_MODE_BY_EXTERNAL_TEMP = 0x03  # not confirmed
-START_MODE_BY_POWER = 0x04  # CONFIRMED working
+START_MODE_BY_HEATER_TEMP = 0x01      # by internal heater sensor
+START_MODE_BY_CONTROLLER_TEMP = 0x02  # by panel/controller-reported temperature
+START_MODE_BY_EXTERNAL_TEMP = 0x03   # by external DS18B20 sensor
+START_MODE_BY_POWER = 0x04           # CONFIRMED working
+
+# ── Regulation source strings (used by select entity and coordinator) ─────────
+
+REG_SOURCE_INTERNAL = "internal"
+REG_SOURCE_PANEL = "panel"
+REG_SOURCE_EXTERNAL = "external"
+REG_SOURCE_POWER = "power"
+
+REG_SOURCE_OPTIONS = [
+    REG_SOURCE_INTERNAL,
+    REG_SOURCE_PANEL,
+    REG_SOURCE_EXTERNAL,
+    REG_SOURCE_POWER,
+]
+
+REG_SOURCE_TO_MODE: dict[str, int] = {
+    REG_SOURCE_INTERNAL: START_MODE_BY_HEATER_TEMP,
+    REG_SOURCE_PANEL: START_MODE_BY_CONTROLLER_TEMP,
+    REG_SOURCE_EXTERNAL: START_MODE_BY_EXTERNAL_TEMP,
+    REG_SOURCE_POWER: START_MODE_BY_POWER,
+}
+
+MODE_TO_REG_SOURCE: dict[int, str] = {v: k for k, v in REG_SOURCE_TO_MODE.items()}
 
 # ── Temperature / power limits ────────────────────────────────────────────────
 
 POWER_LEVEL_MIN = 1
 POWER_LEVEL_MAX = 9
 
-# Conservative climate target-temperature range (°C)
+# Climate target-temperature range (°C) — confirmed 0–30 per task spec
 CLIMATE_TEMP_MIN = 0.0
 CLIMATE_TEMP_MAX = 30.0
 CLIMATE_TEMP_STEP = 1.0
 
-# ── Safety timeouts ───────────────────────────────────────────────────────────
+# Clamp range for panel-fed sensor values (safety guard against wild readings)
+PANEL_TEMP_MIN = -30
+PANEL_TEMP_MAX = 60
 
-STOP_RESEND_INTERVAL = 10  # re-send STOP every N s during cooldown
-COMMAND_DEBOUNCE = 5  # minimum seconds between start/stop commands
+# ── Coordinator timing ────────────────────────────────────────────────────────
+
+STOP_RESEND_INTERVAL = 10      # re-send STOP every N s during cooldown
+COMMAND_DEBOUNCE = 5           # minimum seconds between start/stop commands
+SETTINGS_READ_INTERVAL = 60    # seconds between periodic settings re-reads from heater
 
 # ── Primary state codes (status1) ────────────────────────────────────────────
 

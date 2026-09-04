@@ -24,12 +24,23 @@ _stub("homeassistant.config_entries", ConfigEntry=object, ConfigFlow=object, Opt
 _stub(
     "homeassistant.const",
     Platform=types.SimpleNamespace(
-        CLIMATE="climate", SENSOR="sensor", BINARY_SENSOR="binary_sensor"
+        CLIMATE="climate", SENSOR="sensor", BINARY_SENSOR="binary_sensor",
+        SELECT="select", NUMBER="number",
     ),
 )
 _stub("homeassistant.core", HomeAssistant=object, callback=lambda f: f)
 _stub("homeassistant.exceptions", ConfigEntryNotReady=Exception)
 
+# ── homeassistant.util.dt stub (used by coordinator for staleness checks) ─────
+_stub("homeassistant.util")
+import datetime as _datetime
+
+class _FakeDtUtil:
+    @staticmethod
+    def utcnow():
+        return _datetime.datetime.now(_datetime.timezone.utc)
+
+_stub("homeassistant.util.dt", utcnow=_FakeDtUtil.utcnow)
 
 # Generic base classes that support subscript (Coordinator[T] etc.)
 class _Subscriptable:
@@ -83,6 +94,15 @@ _stub(
         RUNNING="running", PROBLEM="problem", CONNECTIVITY="connectivity"
     ),
 )
+_stub(
+    "homeassistant.components.select",
+    SelectEntity=object,
+)
+_stub(
+    "homeassistant.components.number",
+    NumberEntity=object,
+    NumberMode=types.SimpleNamespace(SLIDER="slider", BOX="box"),
+)
 
 # units
 _stub(
@@ -91,7 +111,8 @@ _stub(
     UnitOfElectricPotential=types.SimpleNamespace(VOLT="V"),
     ATTR_TEMPERATURE="temperature",
     Platform=types.SimpleNamespace(
-        CLIMATE="climate", SENSOR="sensor", BINARY_SENSOR="binary_sensor"
+        CLIMATE="climate", SENSOR="sensor", BINARY_SENSOR="binary_sensor",
+        SELECT="select", NUMBER="number",
     ),
 )
 
@@ -112,6 +133,9 @@ _STATE_NAMES = {
     (4, 0): "shutdown",
 }
 
+_REG_SOURCE_TO_MODE = {"internal": 0x01, "panel": 0x02, "external": 0x03, "power": 0x04}
+_MODE_TO_REG_SOURCE = {v: k for k, v in _REG_SOURCE_TO_MODE.items()}
+
 _stub(
     "custom_components.autoterm.const",
     DOMAIN="autoterm",
@@ -120,6 +144,8 @@ _stub(
     CMD_START=0x01,
     CMD_GET_SETTINGS=0x02,
     CMD_GET_VERSION=0x06,
+    CMD_SET_TEMP=0x11,
+    CMD_FAN_ONLY=0x23,
     START_MODE_BY_POWER=0x04,
     START_MODE_BY_HEATER_TEMP=0x01,
     START_MODE_BY_CONTROLLER_TEMP=0x02,
@@ -127,15 +153,22 @@ _stub(
     DEFAULT_BAUD=2400,
     DEFAULT_POLL_INTERVAL=5,
     DEFAULT_NAME="Autoterm Air 4D",
+    DEFAULT_POWER_LEVEL=5,
+    DEFAULT_FAN_LEVEL=5,
+    DEFAULT_STALENESS_THRESHOLD=120,
     CONF_PORT="port",
     CONF_BAUD_RATE="baud_rate",
     CONF_POLL_INTERVAL="poll_interval",
+    CONF_TEMP_SOURCE_ENTITY="temp_source_entity",
+    CONF_STALENESS_THRESHOLD="staleness_threshold",
     HINT_PORT="/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_ABAKLQ9A-if00-port0",
     POWER_LEVEL_MIN=1,
     POWER_LEVEL_MAX=9,
     CLIMATE_TEMP_MIN=0.0,
     CLIMATE_TEMP_MAX=30.0,
     CLIMATE_TEMP_STEP=1.0,
+    PANEL_TEMP_MIN=-30,
+    PANEL_TEMP_MAX=60,
     STATE1_IDLE=0,
     STATE1_STARTING=1,
     STATE1_WARMUP=2,
@@ -143,9 +176,18 @@ _stub(
     STATE1_SHUTDOWN=4,
     STOP_RESEND_INTERVAL=10,
     COMMAND_DEBOUNCE=5,
+    SETTINGS_READ_INTERVAL=60,
     FAULT_LOCKOUT=33,
     FAULT_CODES={},
+    FAULT_RETRYABLE=frozenset({13}),
     STATE_NAMES=_STATE_NAMES,
+    REG_SOURCE_INTERNAL="internal",
+    REG_SOURCE_PANEL="panel",
+    REG_SOURCE_EXTERNAL="external",
+    REG_SOURCE_POWER="power",
+    REG_SOURCE_OPTIONS=["internal", "panel", "external", "power"],
+    REG_SOURCE_TO_MODE=_REG_SOURCE_TO_MODE,
+    MODE_TO_REG_SOURCE=_MODE_TO_REG_SOURCE,
 )
 
 import os as _os  # noqa: E402

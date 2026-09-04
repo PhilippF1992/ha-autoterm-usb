@@ -13,10 +13,16 @@ import asyncio
 import logging
 
 from .codec import (
+    GET_SETTINGS_REQ,
     STATUS_REQ,
     STOP_CMD,
     HeaterStatus,
+    SettingsPayload,
+    build_fan_only,
+    build_set_temp,
     build_start,
+    build_write_settings,
+    parse_settings,
     parse_status,
     read_frame_from_buffer,
 )
@@ -182,11 +188,8 @@ class AutotermClient:
     ) -> bool:
         """
         Send the START command TWICE as the protocol requires (< 1 s apart).
-        mode=START_MODE_BY_POWER (0x04) is the ONLY confirmed mode.
+        mode=START_MODE_BY_POWER (0x04) is CONFIRMED. Temperature modes are PORTED.
         Returns True if both sends were acknowledged.
-
-        Ventilation-only start is NOT implemented here — the frame is unconfirmed.
-        Call sites that want FAN_ONLY must guard and log, not call this method.
         """
         cmd = build_start(level=level, setpoint=setpoint, mode=mode, ventilation=0)
         async with self._lock:
@@ -197,4 +200,66 @@ class AutotermClient:
             await asyncio.sleep(0.5)
             r2 = await self._transact(cmd)
             _LOGGER.debug("START-2 ack: %s", r2.hex() if r2 else "none")
+        return r1 is not None and r2 is not None
+
+    async def send_set_temp(self, temp_c: int) -> bool:
+        """
+        Send SET_TEMP (0x11) — sets the temperature setpoint or feeds the panel
+        temperature to the heater (same frame for both purposes).
+
+        CONFIRMED frame: send_set_temp(20) → AA 03 01 00 11 14 B2 51
+        """
+        resp = await self.transact(build_set_temp(temp_c))
+        if resp is None:
+            _LOGGER.debug("SET_TEMP(0x11) for %d°C got no ack", temp_c)
+        return resp is not None
+
+    async def send_write_settings(
+        self,
+        mode: int,
+        setpoint: int,
+        ventilation: int,
+        power_level: int,
+    ) -> bool:
+        """
+        Write heater settings via 0x02 frame.
+
+        PORTED-BUT-UNVERIFIED for the write path. Read path (GET_SETTINGS_REQ) is confirmed.
+        """
+        cmd = build_write_settings(mode, setpoint, ventilation, power_level)
+        resp = await self.transact(cmd)
+        if resp is None:
+            _LOGGER.warning("WRITE_SETTINGS(0x02) got no ack")
+        return resp is not None
+
+    async def get_settings(self) -> SettingsPayload | None:
+        """
+        Read current heater settings via 0x02 (no-payload request).
+        Returns None if the heater doesn't respond or the response can't be parsed.
+        """
+        resp = await self.transact(GET_SETTINGS_REQ)
+        if resp is None:
+            _LOGGER.debug("GET_SETTINGS(0x02) got no response")
+            return None
+        settings = parse_settings(resp)
+        if settings is None:
+            _LOGGER.warning("GET_SETTINGS(0x02) response undecodable: %s", resp.hex())
+        return settings
+
+    async def send_fan_only(self, fan_level: int = 5) -> bool:
+        """
+        Send FAN_ONLY (0x23) command TWICE (mirrors START protocol).
+
+        PORTED-BUT-UNVERIFIED: frame not confirmed on the 44D.
+        Source: prclm (4D/44D reference). Last byte 0x0F per prclm; k3mpaxl uses 0xFF.
+        """
+        cmd = build_fan_only(fan_level)
+        async with self._lock:
+            if not self._connected:
+                return False
+            r1 = await self._transact(cmd)
+            _LOGGER.debug("FAN_ONLY-1 ack: %s", r1.hex() if r1 else "none")
+            await asyncio.sleep(0.5)
+            r2 = await self._transact(cmd)
+            _LOGGER.debug("FAN_ONLY-2 ack: %s", r2.hex() if r2 else "none")
         return r1 is not None and r2 is not None

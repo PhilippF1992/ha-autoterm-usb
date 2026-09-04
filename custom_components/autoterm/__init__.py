@@ -26,6 +26,8 @@ PLATFORMS: list[Platform] = [
     Platform.CLIMATE,
     Platform.SENSOR,
     Platform.BINARY_SENSOR,
+    Platform.SELECT,
+    Platform.NUMBER,
 ]
 
 
@@ -44,10 +46,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass=hass,
         client=client,
         poll_interval=int(poll_interval),
+        entry=entry,
     )
 
-    # Initial poll — raises ConfigEntryNotReady if the heater doesn't respond
+    # Initial poll
     await coordinator.async_config_entry_first_refresh()
+
+    # Read current heater settings to initialise reg_source / target_temp / power_level
+    await coordinator.async_refresh_settings()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

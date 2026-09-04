@@ -25,33 +25,20 @@ from .const import (
     CLIMATE_TEMP_MIN,
     CLIMATE_TEMP_STEP,
     COMMAND_DEBOUNCE,
+    CONF_TEMP_SOURCE_ENTITY,
     DOMAIN,
     FAULT_RETRYABLE,
     POWER_LEVEL_MAX,
     POWER_LEVEL_MIN,
-    START_MODE_BY_POWER,
+    REG_SOURCE_PANEL,
+    REG_SOURCE_POWER,
+    REG_SOURCE_TO_MODE,
 )
 from .coordinator import AutotermCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# Default power level when no target temperature is set
-_DEFAULT_LEVEL = 9
-
-# ── Temperature → power level mapping ────────────────────────────────────────
-# NOTE: mode=by-power (0x04) is CONFIRMED. The heater doesn't expose a true
-# temperature setpoint that maps 1:1 to power, so we approximate linearly.
-# Once mode=0x01 (by-heater-temp) is tested, this mapping can be replaced
-# with a direct setpoint send.
-
-
-def _temp_to_level(temp: float) -> int:
-    frac = (temp - CLIMATE_TEMP_MIN) / (CLIMATE_TEMP_MAX - CLIMATE_TEMP_MIN)
-    level = round(frac * (POWER_LEVEL_MAX - POWER_LEVEL_MIN)) + POWER_LEVEL_MIN
-    return max(POWER_LEVEL_MIN, min(POWER_LEVEL_MAX, level))
-
-
-# ── hvac_action from HeaterStatus ─────────────────────────────────────────────
+_DEFAULT_LEVEL = 5
 
 
 def _hvac_action(status: HeaterStatus | None) -> HVACAction:
@@ -67,11 +54,8 @@ def _hvac_action(status: HeaterStatus | None) -> HVACAction:
             return HVACAction.FAN
         return HVACAction.HEATING
     if s1 == 4:
-        return HVACAction.COOLING  # purge/cooldown cycle
+        return HVACAction.COOLING
     return HVACAction.IDLE
-
-
-# ── hvac_mode reflected from status ──────────────────────────────────────────
 
 
 def _hvac_mode(status: HeaterStatus | None) -> HVACMode:
@@ -95,7 +79,7 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
     """Climate entity representing the Autoterm USB."""
 
     _attr_has_entity_name = True
-    _attr_name = None  # device name IS the entity name
+    _attr_name = None
     _attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT, HVACMode.FAN_ONLY]
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
@@ -106,13 +90,12 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
     _attr_target_temperature_step = CLIMATE_TEMP_STEP
     _attr_min_temp = CLIMATE_TEMP_MIN
     _attr_max_temp = CLIMATE_TEMP_MAX
-    _attr_target_temperature = 20.0  # sane default until user changes it
 
     def __init__(self, coordinator: AutotermCoordinator, entry: ConfigEntry) -> None:
         super().__init__(coordinator)
         self._entry = entry
         self._attr_unique_id = f"{entry.unique_id}_climate"
-        self._last_command = 0.0  # monotonic timestamp of last start/stop
+        self._last_command = 0.0
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -123,7 +106,9 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
             model="Air 4D (Planar 44D)",
         )
 
-    # ── State reflection ──────────────────────────────────────────────────────
+    @property
+    def target_temperature(self) -> float:
+        return self.coordinator.target_temp
 
     @property
     def hvac_mode(self) -> HVACMode:
@@ -135,6 +120,22 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
 
     @property
     def current_temperature(self) -> float | None:
+        """
+        Return the current room temperature.
+
+        Uses the configured HA sensor (e.g. DS18B20) when one is set in options,
+        so the climate card reflects the actual room temp the thermostat is
+        regulating against.  Falls back to the heater's internal sensor when no
+        source entity is configured or its state is not a valid number.
+        """
+        source_entity: str | None = self._entry.options.get(CONF_TEMP_SOURCE_ENTITY)
+        if source_entity:
+            state = self.hass.states.get(source_entity)
+            if state is not None and state.state not in ("unknown", "unavailable"):
+                try:
+                    return float(state.state)
+                except ValueError:
+                    pass
         st = self.coordinator.data
         return float(st.heater_temp) if st else None
 
@@ -145,21 +146,19 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         st = self.coordinator.data
-        if st is None:
-            return {}
         attrs: dict[str, Any] = {
-            "state_name": st.state_name,
-            "status1": st.status1,
-            "status2": st.status2,
-            "error_code": st.error,
-            "power_level": _temp_to_level(self._attr_target_temperature or 20.0),
+            "regulation_source": self.coordinator.reg_source,
+            "power_level": self.coordinator.power_level,
         }
-        if st.is_lockout:
-            attrs["lockout"] = True
-            attrs["lockout_info"] = "Manual unlock procedure required (see manual)"
+        if st is not None:
+            attrs["state_name"] = st.state_name
+            attrs["status1"] = st.status1
+            attrs["status2"] = st.status2
+            attrs["error_code"] = st.error
+            if st.is_lockout:
+                attrs["lockout"] = True
+                attrs["lockout_info"] = "Manual unlock procedure required (see manual)"
         return attrs
-
-    # ── Commands ──────────────────────────────────────────────────────────────
 
     def _debounced(self) -> bool:
         elapsed = time.monotonic() - self._last_command
@@ -182,8 +181,6 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
             await self._async_stop()
 
         elif hvac_mode == HVACMode.HEAT:
-            # Retryable faults (e.g. error 13 = ignition failed) are cleared by
-            # the ECU on the next start attempt — allow the restart through.
             if st and st.is_fault and st.error not in FAULT_RETRYABLE and not st.is_lockout:
                 _LOGGER.warning(
                     "Cannot start: active fault code %d (%s). Clear the fault before restarting.",
@@ -197,29 +194,31 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
                     "Perform the manual unlock procedure first."
                 )
                 return
-            await self._async_start()
+            await self._async_start_heat()
 
         elif hvac_mode == HVACMode.FAN_ONLY:
-            # TODO: ventilation-only start frame is NOT yet confirmed.
-            # The START payload has a ventilation flag (byte[4]=0x01) but the
-            # correct mode for fan-only operation has not been tested.
-            # Sending an unconfirmed frame risks unintended ignition.
-            # This will be implemented once the frame is confirmed on real hardware.
-            _LOGGER.warning(
-                "FAN_ONLY mode is not yet implemented: "
-                "the ventilation-only start frame has not been confirmed. "
-                "Use HEAT mode to run the heater."
-            )
+            await self._async_start_fan_only()
 
     async def async_set_temperature(self, **kwargs: Any) -> None:
         temp = kwargs.get(ATTR_TEMPERATURE)
-        if temp is not None:
-            self._attr_target_temperature = float(temp)
-            self.async_write_ha_state()
-            # If already running, update power level
-            st = self.coordinator.data
-            if st and st.is_running and not self._debounced():
-                await self._async_start()
+        if temp is None:
+            return
+        temp = float(temp)
+        temp = max(CLIMATE_TEMP_MIN, min(CLIMATE_TEMP_MAX, temp))
+        self.coordinator.target_temp = temp
+        self.async_write_ha_state()
+
+        st = self.coordinator.data
+        if st and (st.is_running or st.is_starting):
+            # Live setpoint update via 0x11 — does not require a full restart.
+            # In panel mode the coordinator loop feeds temp, so only send in
+            # non-panel temperature modes and power mode.
+            if self.coordinator.reg_source != REG_SOURCE_PANEL and not self._debounced():
+                ok = await self.coordinator.client.send_set_temp(int(round(temp)))
+                self._last_command = time.monotonic()
+                if not ok:
+                    _LOGGER.warning("SET_TEMP(0x11) for %.0f°C got no ack", temp)
+                await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self) -> None:
         await self.async_set_hvac_mode(HVACMode.HEAT)
@@ -227,16 +226,60 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
     async def async_turn_off(self) -> None:
         await self.async_set_hvac_mode(HVACMode.OFF)
 
-    # ── Internal helpers ──────────────────────────────────────────────────────
+    async def _async_start_heat(self) -> None:
+        """
+        Start the heater in HEAT mode using the current regulation source.
 
-    async def _async_start(self) -> None:
-        level = _temp_to_level(self._attr_target_temperature or 20.0)
-        target = self._attr_target_temperature or 20.0
-        _LOGGER.info("Sending START at power level %d (target=%.0f°C)", level, target)
-        ok = await self.coordinator.client.send_start(level=level, mode=START_MODE_BY_POWER)
+        Regulation behaviour:
+          - internal / panel / external  → mode = 0x01/0x02/0x03; setpoint = target_temp.
+            After START, also send 0x11 setpoint frame for immediate effect.
+            In panel mode the coordinator loop takes over the 0x11 injection.
+          - power → mode = 0x04; power_level = coordinator.power_level.
+        """
+        mode = REG_SOURCE_TO_MODE.get(self.coordinator.reg_source, 0x04)
+        setpoint = int(round(self.coordinator.target_temp))
+        level = self.coordinator.power_level
+
+        _LOGGER.info(
+            "Sending START: mode=%s(0x%02x) setpoint=%d°C power_level=%d",
+            self.coordinator.reg_source,
+            mode,
+            setpoint,
+            level,
+        )
+        ok = await self.coordinator.client.send_start(
+            level=level,
+            setpoint=setpoint,
+            mode=mode,
+        )
         self._last_command = time.monotonic()
         if not ok:
             _LOGGER.error("START command failed or got no acknowledgement")
+            return
+
+        # In temperature modes, send an immediate setpoint frame as well.
+        # In panel mode the coordinator loop will feed the measured temp via 0x11.
+        if self.coordinator.reg_source not in (REG_SOURCE_POWER, REG_SOURCE_PANEL):
+            await self.coordinator.client.send_set_temp(setpoint)
+
+        await self.coordinator.async_request_refresh()
+
+    async def _async_start_fan_only(self) -> None:
+        """
+        Start ventilation-only (FAN_ONLY) mode via 0x23.
+
+        PORTED-BUT-UNVERIFIED: frame 0x23 has not been confirmed on the 44D.
+        Source: prclm (4D/44D) + k3mpaxl (2D) both confirm command ID 0x23.
+        The last payload byte differs between sources (0x0F vs 0xFF); we follow prclm.
+        """
+        _LOGGER.info(
+            "Sending FAN_ONLY (0x23) at fan_level=%d — PORTED, not yet confirmed on 44D",
+            self.coordinator.fan_level,
+        )
+        ok = await self.coordinator.client.send_fan_only(self.coordinator.fan_level)
+        self._last_command = time.monotonic()
+        if not ok:
+            _LOGGER.error("FAN_ONLY command failed or got no acknowledgement")
         await self.coordinator.async_request_refresh()
 
     async def _async_stop(self) -> None:
@@ -245,6 +288,4 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
         self._last_command = time.monotonic()
         if not ok:
             _LOGGER.error("STOP command failed — heater may not have received it")
-        # Do NOT close the port — heater needs to complete its purge cycle.
-        # Keep polling; entities reflect the stopping→idle transition naturally.
         await self.coordinator.async_request_refresh()

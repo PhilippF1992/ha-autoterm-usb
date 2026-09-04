@@ -10,7 +10,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .const import CMD_START, CMD_STATUS, CMD_STOP, START_MODE_BY_POWER, STATE_NAMES
+from .const import (
+    CMD_FAN_ONLY,
+    CMD_GET_SETTINGS,
+    CMD_SET_TEMP,
+    CMD_START,
+    CMD_STATUS,
+    CMD_STOP,
+    START_MODE_BY_POWER,
+    STATE_NAMES,
+)
 
 # ── CRC-16 / Modbus ───────────────────────────────────────────────────────────
 
@@ -40,8 +49,9 @@ def build(cmd: int, payload: bytes = b"") -> bytes:
 
 # ── Pre-built constant frames (CONFIRMED against real hardware) ───────────────
 
-STATUS_REQ: bytes = build(CMD_STATUS)  # AA 03 00 00 0F 58 7C
-STOP_CMD: bytes = build(CMD_STOP)  # AA 03 00 00 03 5D 7C
+STATUS_REQ: bytes = build(CMD_STATUS)       # AA 03 00 00 0F 58 7C
+STOP_CMD: bytes = build(CMD_STOP)           # AA 03 00 00 03 5D 7C
+GET_SETTINGS_REQ: bytes = build(CMD_GET_SETTINGS)  # AA 03 00 00 02 9D BD
 
 
 def build_start(
@@ -53,12 +63,13 @@ def build_start(
     """
     Build a START (0x01) frame.
 
-    mode=0x04 (by-power) is the ONLY confirmed mode.
-    mode=0x01 (by heater temp) is unconfirmed — do not use in production yet.
-    ventilation=1 (fan-only start) is UNCONFIRMED; caller must guard against sending it.
+    mode=0x04 (by-power) is CONFIRMED. All temperature modes (0x01–0x03) are
+    PORTED from reference repos but not independently confirmed on the 44D.
+    ventilation=1 starts fan-only; use build_fan_only() for dedicated fan-only.
 
-    Confirmed working frame for level=9:
-      AA 03 06 00 01 FF FF 04 0F 00 09 7F 1F
+    Confirmed working frames:
+      level=9:  AA 03 06 00 01 FF FF 04 0F 00 09 7F 1F
+      level=2:  AA 03 06 00 01 FF FF 04 0F 00 02 B8 5E
     """
     payload = bytes(
         [
@@ -71,6 +82,60 @@ def build_start(
         ]
     )
     return build(CMD_START, payload)
+
+
+def build_set_temp(temp_c: int) -> bytes:
+    """
+    Build a SET_TEMP (0x11) frame. 1-byte payload = temperature in °C.
+
+    This is used for two purposes:
+      1. Setting the temperature setpoint directly.
+      2. Feeding the current measured room temperature (panel mode, ~1 Hz).
+
+    CONFIRMED frame: build_set_temp(20) → AA 03 01 00 11 14 B2 51
+    Source: task spec (confirmed on real hardware) + prclm/AutotermHeaterController
+            + k3mpaxl/pekaway-ha-autoterm (CMD_SET_TEMP = 0x11).
+    """
+    return build(CMD_SET_TEMP, bytes([temp_c & 0xFF]))
+
+
+def build_write_settings(
+    mode: int,
+    setpoint: int,
+    ventilation: int,
+    power_level: int,
+) -> bytes:
+    """
+    Build a WRITE SETTINGS (0x02) frame. 6-byte payload identical to START payload.
+
+    PORTED-BUT-UNVERIFIED for the write path.
+    Source: protocol.md (payload format) + prclm (reserved bytes FF FF for write).
+    Read path (GET_SETTINGS_REQ) is confirmed per protocol.md.
+    """
+    payload = bytes(
+        [
+            0xFF,
+            0xFF,
+            mode & 0xFF,
+            setpoint & 0xFF,
+            ventilation & 0xFF,
+            power_level & 0xFF,
+        ]
+    )
+    return build(CMD_GET_SETTINGS, payload)
+
+
+def build_fan_only(fan_level: int = 5) -> bytes:
+    """
+    Build a FAN_ONLY (0x23) frame. 4-byte payload.
+
+    PORTED-BUT-UNVERIFIED on the 44D — not confirmed on real hardware.
+    Source: prclm/AutotermHeaterController (4D/44D reference, last byte 0x0F).
+    Note: k3mpaxl (2D reference) uses last byte 0xFF instead of 0x0F.
+    We follow prclm as the 4D-specific reference.
+    Sent TWICE (same as START) per prclm.
+    """
+    return build(CMD_FAN_ONLY, bytes([0xFF, 0xFF, fan_level & 0xFF, 0x0F]))
 
 
 # ── Frame extractor (works on a buffer, no I/O) ───────────────────────────────
@@ -191,4 +256,47 @@ def parse_status(frame: bytes) -> HeaterStatus | None:
         flame_k=p[7] * 256 + p[8],
         # p[9] = GUESSED activity byte (0x00 idle, 0x01 starting, 0x05 fault)
         raw_payload=bytes(p),
+    )
+
+
+# ── Settings payload ──────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class SettingsPayload:
+    """Decoded heater settings from a 0x02 response frame."""
+
+    mode: int        # 1=internal, 2=panel, 3=external, 4=by-power
+    setpoint: int    # °C
+    ventilation: int # 0=off, 1=on
+    power_level: int # 1–9
+
+
+def parse_settings(frame: bytes) -> SettingsPayload | None:
+    """
+    Decode a SETTINGS (0x02) response frame into a SettingsPayload.
+
+    Also accepts a START (0x01) response frame since both share the same
+    6-byte payload layout (protocol.md).
+
+    Returns None on: bad CRC, wrong type byte, truncated payload.
+    CRC re-validated for defence in depth.
+    """
+    if not frame or len(frame) < 7:
+        return None
+    if crc16(frame[:-2]) != frame[-2:]:
+        return None
+    if frame[1] != 0x04:
+        return None
+    if frame[4] not in (0x01, 0x02):
+        return None
+    p = frame[5 : 5 + frame[2]]
+    if len(p) < 6:
+        return None
+    # p[0:2] = reserved (0x00 0x78 in observed responses)
+    return SettingsPayload(
+        mode=p[2],
+        setpoint=p[3],
+        ventilation=p[4],
+        power_level=p[5],
     )
