@@ -159,15 +159,18 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             await self.async_set_unique_id(unique_id)
             self._abort_if_unique_id_configured()
 
+            options: dict = {
+                CONF_BAUD_RATE: user_input[CONF_BAUD_RATE],
+                CONF_POLL_INTERVAL: user_input[CONF_POLL_INTERVAL],
+                CONF_STALENESS_THRESHOLD: user_input[CONF_STALENESS_THRESHOLD],
+            }
+            if user_input.get(CONF_TEMP_SOURCE_ENTITY):
+                options[CONF_TEMP_SOURCE_ENTITY] = user_input[CONF_TEMP_SOURCE_ENTITY]
+
             return self.async_create_entry(
                 title=user_input.get("name", DEFAULT_NAME),
-                data={
-                    CONF_PORT: self._port,
-                },
-                options={
-                    CONF_BAUD_RATE: user_input[CONF_BAUD_RATE],
-                    CONF_POLL_INTERVAL: user_input[CONF_POLL_INTERVAL],
-                },
+                data={CONF_PORT: self._port},
+                options=options,
             )
 
         schema = vol.Schema(
@@ -180,6 +183,14 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
                 vol.Required(CONF_POLL_INTERVAL, default=DEFAULT_POLL_INTERVAL): NumberSelector(
                     NumberSelectorConfig(min=2, max=60, step=1, mode=NumberSelectorMode.SLIDER)
+                ),
+                vol.Optional(CONF_TEMP_SOURCE_ENTITY): EntitySelector(
+                    EntitySelectorConfig(domain="sensor")
+                ),
+                vol.Optional(
+                    CONF_STALENESS_THRESHOLD, default=DEFAULT_STALENESS_THRESHOLD
+                ): NumberSelector(
+                    NumberSelectorConfig(min=30, max=600, step=10, mode=NumberSelectorMode.SLIDER)
                 ),
             }
         )
