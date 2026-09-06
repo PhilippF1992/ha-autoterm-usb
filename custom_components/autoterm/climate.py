@@ -207,19 +207,47 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
         self.async_write_ha_state()
 
         st = self.coordinator.data
-        # Live setpoint update via 0x11 — no restart needed.
-        # Skip in panel mode; the coordinator loop feeds the measured temp instead.
-        if (
+        setpoint = int(round(temp))
+        mode = REG_SOURCE_TO_MODE.get(self.coordinator.reg_source, 0x04)
+
+        if st and st.is_idle and not self._debounced():
+            # Heater idle: persist to stored settings so the next settings read echoes it back.
+            # Only send write in temperature-regulated modes — in power mode the heater
+            # doesn't use or reliably store the setpoint via 0x02 write.
+            if self.coordinator.reg_source != REG_SOURCE_POWER:
+                ok = await self.coordinator.client.send_write_settings(
+                    mode=mode,
+                    setpoint=setpoint,
+                    ventilation=0,
+                    power_level=self.coordinator.power_level,
+                )
+                self._last_command = time.monotonic()
+                if not ok:
+                    _LOGGER.warning("WRITE_SETTINGS(0x02) for %.0f°C got no ack", temp)
+            await self.coordinator.async_request_refresh()
+        elif (
             st
             and (st.is_running or st.is_starting)
             and self.coordinator.reg_source != REG_SOURCE_PANEL
             and not self._debounced()
         ):
-                ok = await self.coordinator.client.send_set_temp(int(round(temp)))
-                self._last_command = time.monotonic()
-                if not ok:
-                    _LOGGER.warning("SET_TEMP(0x11) for %.0f°C got no ack", temp)
-                await self.coordinator.async_request_refresh()
+            # Heater running: live setpoint injection via 0x11 — no restart needed.
+            # Skip in panel mode; the coordinator loop feeds the measured temp instead.
+            ok = await self.coordinator.client.send_set_temp(setpoint)
+            self._last_command = time.monotonic()
+            if not ok:
+                _LOGGER.warning("SET_TEMP(0x11) for %.0f°C got no ack", temp)
+            # Also persist to stored settings in temperature-regulated modes so the
+            # next 0x02 settings read echoes back the new setpoint (0x11 alone doesn't
+            # update the heater's stored settings).
+            if self.coordinator.reg_source != REG_SOURCE_POWER:
+                await self.coordinator.client.send_write_settings(
+                    mode=mode,
+                    setpoint=setpoint,
+                    ventilation=0,
+                    power_level=self.coordinator.power_level,
+                )
+            await self.coordinator.async_request_refresh()
 
     async def async_turn_on(self) -> None:
         await self.async_set_hvac_mode(HVACMode.HEAT)

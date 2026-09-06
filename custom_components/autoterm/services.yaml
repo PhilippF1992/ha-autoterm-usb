@@ -1,0 +1,69 @@
+prime_fuel:
+  name: Prime fuel line
+  description: >
+    Primes the Planar 44D fuel line by repeatedly attempting ignition at low
+    power until a clean light-off is confirmed, then stops cleanly.
+    Designed for first-start on a dry line or after a long idle period.
+    Progress is reported via HA events (autoterm_prime_progress /
+    autoterm_prime_finished) and the integration log.
+    A smoky/over-rich first light is normal — that is the prime "taking".
+  fields:
+    power_level:
+      name: Power level
+      description: >
+        Target power level during priming (1–9). Default 2. Low power is
+        sufficient — ignition dosing follows the startup ramp regardless of
+        target power, so higher values only burn hotter once running.
+      required: false
+      default: 2
+      selector:
+        number:
+          min: 1
+          max: 9
+          step: 1
+          mode: slider
+
+    max_attempts:
+      name: Max ignition attempts
+      description: >
+        Hard cap on ignition retries before giving up (1–10). Default 6.
+        Do not set this high — repeated forced starts on a dry line risk
+        flooding/sooting the combustion chamber.
+      required: false
+      default: 6
+      selector:
+        number:
+          min: 1
+          max: 10
+          step: 1
+          mode: slider
+
+    flame_confirm_delta:
+      name: Flame confirmation delta (°C)
+      description: >
+        Heat-exchanger temperature rise above the heater's ambient sensor (°C)
+        required to confirm a clean light-off. Default 40°C. Raise if you get
+        false positives; lower if you are in a warm environment.
+      required: false
+      default: 40
+      selector:
+        number:
+          min: 10
+          max: 200
+          step: 1
+          mode: box
+
+    stabilize_seconds:
+      name: Stabilise duration (s)
+      description: >
+        How long to hold the flame after confirmed light-off before sending
+        STOP. Use to warm the combustion chamber. Default 60 s.
+        Set to 0 to stop immediately after confirmation.
+      required: false
+      default: 60
+      selector:
+        number:
+          min: 0
+          max: 600
+          step: 5
+          mode: slider

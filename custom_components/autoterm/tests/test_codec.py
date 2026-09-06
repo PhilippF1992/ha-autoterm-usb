@@ -440,3 +440,16 @@ def test_build_fan_only_crc_all_levels():
     for level in range(1, 10):
         frame = build_fan_only(level)
         assert crc16(frame[:-2]) == frame[-2:], f"CRC wrong for FAN_ONLY level={level}"
+
+
+@pytest.mark.parametrize("level", range(1, 10))
+def test_build_fan_only_level_encoding(level: int) -> None:
+    """Fan speed must be encoded at payload[2] (frame byte 7) for every valid level.
+
+    This is the critical byte the heater reads to set the fan RPM.  A re-send of
+    the FAN_ONLY (0x23) frame is the only way to change speed while ventilating —
+    there is no separate set-speed command.
+    """
+    frame = build_fan_only(level)
+    assert frame[7] == level, f"Expected fan_level={level} at byte 7, got {frame[7]}"
+    assert crc16(frame[:-2]) == frame[-2:]

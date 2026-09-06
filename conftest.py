@@ -28,8 +28,8 @@ _stub(
         SELECT="select", NUMBER="number",
     ),
 )
-_stub("homeassistant.core", HomeAssistant=object, callback=lambda f: f)
-_stub("homeassistant.exceptions", ConfigEntryNotReady=Exception)
+_stub("homeassistant.core", HomeAssistant=object, callback=lambda f: f, ServiceCall=object)
+_stub("homeassistant.exceptions", ConfigEntryNotReady=Exception, HomeAssistantError=Exception)
 
 # ── homeassistant.util.dt stub (used by coordinator for staleness checks) ─────
 _stub("homeassistant.util")
@@ -180,7 +180,7 @@ _stub(
     SETTINGS_READ_INTERVAL=60,
     FAULT_LOCKOUT=33,
     FAULT_CODES={},
-    FAULT_RETRYABLE=frozenset({13}),
+    FAULT_RETRYABLE=frozenset({13, 30, 34}),
     STATE_NAMES=_STATE_NAMES,
     REG_SOURCE_INTERNAL="internal",
     REG_SOURCE_PANEL="panel",

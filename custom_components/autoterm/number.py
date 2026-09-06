@@ -132,4 +132,15 @@ class AutotermFanLevel(CoordinatorEntity[AutotermCoordinator], NumberEntity):
         level = max(POWER_LEVEL_MIN, min(POWER_LEVEL_MAX, level))
         self.coordinator.fan_level = level
         self.async_write_ha_state()
-        _LOGGER.debug("Fan level stored as %d; applies on next FAN_ONLY command", level)
+
+        st = self.coordinator.data
+        if st is not None and st.is_fan_only:
+            # Heater is running in ventilation mode — re-send 0x23 with the new speed.
+            # Fan speed is embedded in the FAN_ONLY frame; there is no separate command.
+            _LOGGER.info("Fan level changed to %d while venting — re-sending FAN_ONLY", level)
+            ok = await self.coordinator.client.send_fan_only(level)
+            if not ok:
+                _LOGGER.warning("Failed to update fan level to %d", level)
+            await self.coordinator.async_request_refresh()
+        else:
+            _LOGGER.debug("Fan level stored as %d; applies on next FAN_ONLY command", level)

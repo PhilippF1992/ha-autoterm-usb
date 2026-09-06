@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import time
@@ -78,6 +79,11 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
         self._panel_fallback_active: bool = False
         self._consecutive_poll_failures: int = 0
 
+        # ── Fuel-prime state ──────────────────────────────────────────────────
+        self._priming: bool = False
+        self._prime_task: asyncio.Task | None = None
+        self.prime_status: str = "idle"
+
     # ── Settings sync ─────────────────────────────────────────────────────────
 
     async def async_refresh_settings(self) -> None:
@@ -92,7 +98,10 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
     def _apply_settings(self, settings: SettingsPayload) -> None:
         self._settings = settings
         self.reg_source = MODE_TO_REG_SOURCE.get(settings.mode, REG_SOURCE_POWER)
-        self.target_temp = max(CLIMATE_TEMP_MIN, min(CLIMATE_TEMP_MAX, float(settings.setpoint)))
+        # In power mode the heater doesn't regulate by temperature, so don't let
+        # the settings read overwrite a user-configured target_temp.
+        if self.reg_source != REG_SOURCE_POWER:
+            self.target_temp = max(CLIMATE_TEMP_MIN, min(CLIMATE_TEMP_MAX, float(settings.setpoint)))
         self.power_level = max(1, min(9, settings.power_level))
 
     # ── DataUpdateCoordinator override ───────────────────────────────────────

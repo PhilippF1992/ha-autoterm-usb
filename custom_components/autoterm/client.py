@@ -143,11 +143,14 @@ class AutotermClient:
         try:
             self._writer.write(cmd)
             await self._writer.drain()
+            _LOGGER.debug("TX: %s", cmd.hex())
         except OSError as exc:
             _LOGGER.error("Serial write error on %s: %s", self._port, exc)
             self._connected = False
             return None
-        return await self._read_frame(timeout)
+        frame = await self._read_frame(timeout)
+        _LOGGER.debug("RX: %s", frame.hex() if frame else "none")
+        return frame
 
     # ── Public API ────────────────────────────────────────────────────────────
 

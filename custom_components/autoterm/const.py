@@ -146,5 +146,8 @@ FAULT_CODES: dict[int, tuple[str, str]] = {
 
 FAULT_LOCKOUT = 33
 
-# Fault codes where a user-initiated restart is safe (heater clears them on next start attempt)
-FAULT_RETRYABLE: frozenset[int] = frozenset({13})
+# Fault codes where a user-initiated restart is safe (heater clears them on next start attempt).
+# 13 = does not start / no fuel (retryable on dry line).
+# 30, 34 = communication faults: triggered when the HA integration closes the serial port
+#   (e.g. HA restart). If the integration is now polling normally the cause is already gone.
+FAULT_RETRYABLE: frozenset[int] = frozenset({13, 30, 34})
