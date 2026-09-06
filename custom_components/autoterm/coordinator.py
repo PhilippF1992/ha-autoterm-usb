@@ -167,8 +167,8 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
             st = self.data
             if st is not None:
                 temp = st.heater_temp
-                _LOGGER.debug(
-                    "Temp source '%s' unavailable — feeding heater internal %d°C",
+                _LOGGER.warning(
+                    "Temp source '%s' unavailable — feeding heater internal %d°C as fallback",
                     self.temp_source,
                     temp,
                 )
@@ -189,18 +189,48 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
         if self.temp_source == TEMP_SOURCE_HA_SENSOR:
             source_entity: str | None = self._entry.options.get(CONF_TEMP_SOURCE_ENTITY)
             if not source_entity:
+                _LOGGER.warning(
+                    "Temperature source is 'ha_sensor' but no sensor entity is configured "
+                    "in the integration options — falling back to internal sensor"
+                )
                 return None
             state = self.hass.states.get(source_entity)
-            if state is None or state.state in ("unknown", "unavailable"):
+            if state is None:
+                _LOGGER.warning(
+                    "Configured temperature sensor '%s' not found in HA — "
+                    "falling back to internal sensor",
+                    source_entity,
+                )
+                return None
+            if state.state in ("unknown", "unavailable"):
+                _LOGGER.warning(
+                    "Temperature sensor '%s' is %s — falling back to internal sensor",
+                    source_entity,
+                    state.state,
+                )
                 return None
             threshold: int = int(
                 self._entry.options.get(CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD)
             )
-            if (dt_util.utcnow() - state.last_changed).total_seconds() > threshold:
+            age = (dt_util.utcnow() - state.last_changed).total_seconds()
+            if age > threshold:
+                _LOGGER.warning(
+                    "Temperature sensor '%s' last updated %.0f s ago (threshold %d s) — "
+                    "falling back to internal sensor",
+                    source_entity,
+                    age,
+                    threshold,
+                )
                 return None
             try:
                 return int(round(float(state.state)))
             except ValueError:
+                _LOGGER.warning(
+                    "Temperature sensor '%s' state '%s' is not a number — "
+                    "falling back to internal sensor",
+                    source_entity,
+                    state.state,
+                )
                 return None
 
         return None
