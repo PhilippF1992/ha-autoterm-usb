@@ -3,7 +3,8 @@ name = "ha-autoterm-usb"
 version = "0.1.0"
 description = "Home Assistant custom integration for Autoterm / Planar diesel air heaters via USB serial."
 readme = "README.md"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
   "pyserial-asyncio-fast>=0.11",
@@ -19,6 +20,9 @@ dev = [
   "voluptuous>=0.15",
   "homeassistant>=2024.11.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["custom_components*"]
 
 [tool.ruff]
 line-length = 100
