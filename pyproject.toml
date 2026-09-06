@@ -37,6 +37,7 @@ ignore = [
   "PLR0911",  # too many returns
   "PLR0912",  # too many branches (prime_fuel is a state machine)
   "PLR0915",  # too many statements (prime_fuel is a state machine)
+  "PLR0917",  # too many positional arguments (helper functions have wide signatures)
 ]
 
 [tool.ruff.lint.per-file-ignores]
