@@ -287,15 +287,8 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
         await self.coordinator.async_request_refresh()
 
     async def _async_start_fan_only(self) -> None:
-        """
-        Start ventilation-only (FAN_ONLY) mode via 0x23.
-
-        PORTED-BUT-UNVERIFIED: frame 0x23 has not been confirmed on the 44D.
-        """
-        _LOGGER.info(
-            "Sending FAN_ONLY (0x23) at fan_level=%d — PORTED, not yet confirmed on 44D",
-            self.coordinator.fan_level,
-        )
+        """Start ventilation-only (FAN_ONLY) mode via 0x23."""
+        _LOGGER.info("Sending FAN_ONLY (0x23) at fan_level=%d", self.coordinator.fan_level)
         ok = await self.coordinator.client.send_fan_only(self.coordinator.fan_level)
         self._last_command = time.monotonic()
         if not ok:

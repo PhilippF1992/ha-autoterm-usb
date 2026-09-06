@@ -59,8 +59,6 @@ The setup wizard asks for:
 - **Temperature sensor entity** *(optional)* — an HA sensor entity whose state will be fed to the
   heater as the panel temperature when **Temperature Source** is set to `ha_sensor`. Useful for
   using a room sensor instead of the heater's internal intake sensor.
-- **Sensor staleness threshold** — default **120 s**. If the selected HA sensor hasn't updated
-  within this window it is treated as unavailable and the heater's internal sensor is used as fallback.
 
 ### Options flow
 
@@ -81,7 +79,7 @@ All entities belong to a single device per heater.
 |---|---|
 | **Off** | Sends STOP; heater completes purge/cooldown cycle |
 | **Heat** | Starts the heater using the active heating preset |
-| **Fan only** | Starts ventilation without combustion *(ported, not yet confirmed on Air 4D)* |
+| **Fan only** | Starts ventilation without combustion |
 
 **Preset modes** (select via the preset picker):
 
@@ -92,15 +90,15 @@ All entities belong to a single device per heater.
 
 > Preset cannot be changed while the heater is active. Send **Off** first.
 
-**Current temperature:** in *By Temperature* mode, shows the same value being fed to the heater
-(the selected source, or the heater's internal sensor if the source is unavailable). In *By Power*
-mode, shows the heater's internal intake sensor.
+**Current temperature:** always shows the value of the selected Temperature Source (with fallback
+to the heater's internal sensor if the source is unavailable). In *By Temperature* mode this is
+also the value being fed to the heater as panel temp.
 
 ### Select
 
 | Entity | Description |
 |---|---|
-| **Temperature Source** | Which temperature value is fed to the heater as panel temp. Options: `internal` (heater intake sensor), `external` (heater's DS18B20 sensor, only shown when fitted), `ha_sensor` (the configured HA sensor entity). Only available in *By Temperature* preset. Switching source requires no heater restart. |
+| **Temperature Source** | Which temperature value is shown on the climate card and (in *By Temperature* preset) fed to the heater as panel temp. Options: `internal` (heater intake sensor), `external` (heater's DS18B20 sensor, only shown when fitted), `ha_sensor` (the configured HA sensor entity). Available in all presets. Switching source requires no heater restart. |
 
 ### Number
 
@@ -186,7 +184,7 @@ logger:
 | START (by-power, level 2, 15 °C) | `AA 03 06 00 01 FF FF 04 0F 00 02 B8 5E` | ✅ Confirmed |
 | GET SETTINGS | `AA 03 00 00 02 9D BD` | ✅ Confirmed |
 | SET_TEMP (0x11) | `AA 03 01 00 11 [temp] [CRC_H] [CRC_L]` | ✅ Confirmed |
-| FAN ONLY (0x23) | — | ⚠️ Ported, not yet confirmed on Air 4D |
+| FAN ONLY (0x23) | `AA 03 01 00 23 [fan_level] [CRC_H] [CRC_L]` | ✅ Confirmed |
 
 See `design_documents/protocol.md` for the full frame specification and field map.
 

@@ -268,10 +268,8 @@ Starts ventilation-only mode (no combustion). Fan speed is set in the payload.
 AA 03 01 00 23 [fan_level] [CRC_H] [CRC_L]
 ```
 
-> **PORTED-BUT-UNVERIFIED:** This command was ported from `prclm/AutotermHeaterController`
-> (4D/44D) and `k3mpaxl/pekaway-ha-autoterm` (2D). The k3mpaxl implementation uses `0xFF`
-> as the last payload byte; prclm uses `0x0F`. We follow prclm as 4D-specific. This command
-> has **not been confirmed on real Air 4D hardware**.
+> Confirmed working on real Air 4D hardware (September 2026). Ported from `prclm/AutotermHeaterController`
+> (4D/44D); the k3mpaxl (2D) implementation uses `0xFF` as the payload byte — we follow prclm's `0x0F`.
 
 ---
 
