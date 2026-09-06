@@ -238,9 +238,7 @@ class AutotermOptionsFlow(config_entries.OptionsFlow):
             vol.Optional(
                 CONF_TEMP_SOURCE_ENTITY,
                 description={"suggested_value": current_source},
-            ): EntitySelector(
-                EntitySelectorConfig(domain="sensor")
-            ),
+            ): EntitySelector(EntitySelectorConfig(domain="sensor")),
             vol.Optional(
                 CONF_STALENESS_THRESHOLD,
                 default=opts.get(CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD),

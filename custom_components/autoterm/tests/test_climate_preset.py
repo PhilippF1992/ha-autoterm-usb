@@ -75,6 +75,7 @@ def _make_coordinator(
             CONF_STALENESS_THRESHOLD,
             CONF_TEMP_SOURCE_ENTITY,
         )
+
         entry.options[CONF_TEMP_SOURCE_ENTITY] = source_entity
         entry.options[CONF_STALENESS_THRESHOLD] = staleness_threshold
 
@@ -113,6 +114,7 @@ def _make_settings(mode: int, setpoint: int = 20, power_level: int = 5) -> Magic
 
 def test_power_level_available_only_in_by_power():
     from custom_components.autoterm.number import AutotermPowerLevel
+
     coord = _make_coordinator(heating_preset=PRESET_BY_POWER)
     coord.last_update_success = True
     ent = AutotermPowerLevel.__new__(AutotermPowerLevel)
@@ -122,6 +124,7 @@ def test_power_level_available_only_in_by_power():
 
 def test_power_level_unavailable_in_by_temp():
     from custom_components.autoterm.number import AutotermPowerLevel
+
     coord = _make_coordinator(heating_preset=PRESET_BY_TEMP)
     coord.last_update_success = True
     ent = AutotermPowerLevel.__new__(AutotermPowerLevel)
@@ -131,6 +134,7 @@ def test_power_level_unavailable_in_by_temp():
 
 def test_fan_level_available_only_in_fan_only():
     from custom_components.autoterm.number import AutotermFanLevel
+
     st = _make_status(status1=3, status2=35)  # is_fan_only
     coord = _make_coordinator(status=st)
     coord.last_update_success = True
@@ -141,6 +145,7 @@ def test_fan_level_available_only_in_fan_only():
 
 def test_fan_level_unavailable_when_idle():
     from custom_components.autoterm.number import AutotermFanLevel
+
     st = _make_status(status1=0)  # idle
     coord = _make_coordinator(status=st)
     coord.last_update_success = True
@@ -151,6 +156,7 @@ def test_fan_level_unavailable_when_idle():
 
 def test_fan_level_unavailable_when_heating():
     from custom_components.autoterm.number import AutotermFanLevel
+
     st = _make_status(status1=3, status2=0)  # running but not fan_only
     coord = _make_coordinator(status=st)
     coord.last_update_success = True
@@ -161,6 +167,7 @@ def test_fan_level_unavailable_when_heating():
 
 def test_temp_source_available_only_in_by_temp():
     from custom_components.autoterm.select import AutotermTempSourceSelect
+
     coord = _make_coordinator(heating_preset=PRESET_BY_TEMP)
     coord.last_update_success = True
     ent = AutotermTempSourceSelect.__new__(AutotermTempSourceSelect)
@@ -170,6 +177,7 @@ def test_temp_source_available_only_in_by_temp():
 
 def test_temp_source_unavailable_in_by_power():
     from custom_components.autoterm.select import AutotermTempSourceSelect
+
     coord = _make_coordinator(heating_preset=PRESET_BY_POWER)
     coord.last_update_success = True
     ent = AutotermTempSourceSelect.__new__(AutotermTempSourceSelect)
@@ -181,6 +189,7 @@ def test_target_temp_in_supported_features_when_by_temp():
     from homeassistant.components.climate import ClimateEntityFeature
 
     from custom_components.autoterm.climate import AutotermClimate
+
     coord = _make_coordinator(heating_preset=PRESET_BY_TEMP)
     ent = AutotermClimate.__new__(AutotermClimate)
     ent.coordinator = coord
@@ -191,6 +200,7 @@ def test_target_temp_not_in_features_when_by_power():
     from homeassistant.components.climate import ClimateEntityFeature
 
     from custom_components.autoterm.climate import AutotermClimate
+
     coord = _make_coordinator(heating_preset=PRESET_BY_POWER)
     ent = AutotermClimate.__new__(AutotermClimate)
     ent.coordinator = coord
@@ -201,6 +211,7 @@ def test_preset_mode_in_supported_features_always():
     from homeassistant.components.climate import ClimateEntityFeature
 
     from custom_components.autoterm.climate import AutotermClimate
+
     for preset in (PRESET_BY_TEMP, PRESET_BY_POWER):
         coord = _make_coordinator(heating_preset=preset)
         ent = AutotermClimate.__new__(AutotermClimate)
@@ -213,6 +224,7 @@ def test_preset_mode_in_supported_features_always():
 
 def test_temp_source_options_without_external():
     from custom_components.autoterm.select import AutotermTempSourceSelect
+
     st = _make_status(ext_temp=None)
     coord = _make_coordinator(status=st)
     ent = AutotermTempSourceSelect.__new__(AutotermTempSourceSelect)
@@ -225,6 +237,7 @@ def test_temp_source_options_without_external():
 
 def test_temp_source_options_with_external():
     from custom_components.autoterm.select import AutotermTempSourceSelect
+
     st = _make_status(ext_temp=5)
     coord = _make_coordinator(status=st)
     ent = AutotermTempSourceSelect.__new__(AutotermTempSourceSelect)
@@ -237,6 +250,7 @@ def test_temp_source_options_with_external():
 
 def test_temp_source_current_option_falls_back_when_external_gone():
     from custom_components.autoterm.select import AutotermTempSourceSelect
+
     st = _make_status(ext_temp=None)  # sensor gone
     coord = _make_coordinator(temp_source=TEMP_SOURCE_EXTERNAL, status=st)
     ent = AutotermTempSourceSelect.__new__(AutotermTempSourceSelect)
@@ -267,8 +281,9 @@ def test_get_source_temp_external_returns_none_when_absent():
 
 def test_get_source_temp_ha_sensor_valid(monkeypatch):
     st = _make_status(heater_temp=20)
-    coord = _make_coordinator(temp_source=TEMP_SOURCE_HA_SENSOR, status=st,
-                              source_entity="sensor.room_temp")
+    coord = _make_coordinator(
+        temp_source=TEMP_SOURCE_HA_SENSOR, status=st, source_entity="sensor.room_temp"
+    )
     sensor_state = MagicMock()
     sensor_state.state = "19.5"
     sensor_state.last_changed = datetime.datetime.now(datetime.UTC)
@@ -278,20 +293,27 @@ def test_get_source_temp_ha_sensor_valid(monkeypatch):
 
 def test_get_source_temp_ha_sensor_stale_returns_none(monkeypatch):
     st = _make_status(heater_temp=18)
-    coord = _make_coordinator(temp_source=TEMP_SOURCE_HA_SENSOR, status=st,
-                              source_entity="sensor.room_temp", staleness_threshold=120)
+    coord = _make_coordinator(
+        temp_source=TEMP_SOURCE_HA_SENSOR,
+        status=st,
+        source_entity="sensor.room_temp",
+        staleness_threshold=120,
+    )
     sensor_state = MagicMock()
     sensor_state.state = "19.0"
     # Last changed 200 seconds ago — stale
-    sensor_state.last_changed = datetime.datetime.now(datetime.UTC) - datetime.timedelta(seconds=200)
+    sensor_state.last_changed = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
+        seconds=200
+    )
     coord.hass.states.get.return_value = sensor_state
     assert coord._get_source_temp() is None
 
 
 def test_get_source_temp_ha_sensor_unavailable_returns_none():
     st = _make_status(heater_temp=20)
-    coord = _make_coordinator(temp_source=TEMP_SOURCE_HA_SENSOR, status=st,
-                              source_entity="sensor.room_temp")
+    coord = _make_coordinator(
+        temp_source=TEMP_SOURCE_HA_SENSOR, status=st, source_entity="sensor.room_temp"
+    )
     sensor_state = MagicMock()
     sensor_state.state = "unavailable"
     coord.hass.states.get.return_value = sensor_state
@@ -300,8 +322,9 @@ def test_get_source_temp_ha_sensor_unavailable_returns_none():
 
 def test_get_source_temp_ha_sensor_unknown_returns_none():
     st = _make_status(heater_temp=20)
-    coord = _make_coordinator(temp_source=TEMP_SOURCE_HA_SENSOR, status=st,
-                              source_entity="sensor.room_temp")
+    coord = _make_coordinator(
+        temp_source=TEMP_SOURCE_HA_SENSOR, status=st, source_entity="sensor.room_temp"
+    )
     sensor_state = MagicMock()
     sensor_state.state = "unknown"
     coord.hass.states.get.return_value = sensor_state
@@ -325,11 +348,17 @@ def test_get_displayed_temp_external_returns_ext_temp():
 
 def test_get_displayed_temp_stale_ha_sensor_returns_heater_fallback():
     st = _make_status(heater_temp=18)
-    coord = _make_coordinator(temp_source=TEMP_SOURCE_HA_SENSOR, status=st,
-                              source_entity="sensor.room_temp", staleness_threshold=120)
+    coord = _make_coordinator(
+        temp_source=TEMP_SOURCE_HA_SENSOR,
+        status=st,
+        source_entity="sensor.room_temp",
+        staleness_threshold=120,
+    )
     sensor_state = MagicMock()
     sensor_state.state = "19.0"
-    sensor_state.last_changed = datetime.datetime.now(datetime.UTC) - datetime.timedelta(seconds=200)
+    sensor_state.last_changed = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
+        seconds=200
+    )
     coord.hass.states.get.return_value = sensor_state
     # Stale → source returns None → fallback to heater_temp=18
     result = coord.get_displayed_temp()
@@ -339,8 +368,9 @@ def test_get_displayed_temp_stale_ha_sensor_returns_heater_fallback():
 
 def test_get_displayed_temp_unavailable_ha_sensor_returns_heater_fallback():
     st = _make_status(heater_temp=20)
-    coord = _make_coordinator(temp_source=TEMP_SOURCE_HA_SENSOR, status=st,
-                              source_entity="sensor.room_temp")
+    coord = _make_coordinator(
+        temp_source=TEMP_SOURCE_HA_SENSOR, status=st, source_entity="sensor.room_temp"
+    )
     sensor_state = MagicMock()
     sensor_state.state = "unavailable"
     coord.hass.states.get.return_value = sensor_state
@@ -356,6 +386,7 @@ def test_get_displayed_temp_external_falls_back_to_heater_when_absent():
 
 def test_climate_current_temperature_uses_get_displayed_temp():
     from custom_components.autoterm.climate import AutotermClimate
+
     st = _make_status(heater_temp=21, ext_temp=8)
     coord = _make_coordinator(
         heating_preset=PRESET_BY_TEMP,
@@ -370,6 +401,7 @@ def test_climate_current_temperature_uses_get_displayed_temp():
 
 def test_climate_current_temperature_by_power_uses_heater_temp():
     from custom_components.autoterm.climate import AutotermClimate
+
     st = _make_status(heater_temp=25)
     coord = _make_coordinator(heating_preset=PRESET_BY_POWER, status=st)
     ent = AutotermClimate.__new__(AutotermClimate)
@@ -379,6 +411,7 @@ def test_climate_current_temperature_by_power_uses_heater_temp():
 
 def test_climate_current_temperature_stale_source_shows_fallback_not_none():
     from custom_components.autoterm.climate import AutotermClimate
+
     st = _make_status(heater_temp=18)
     coord = _make_coordinator(
         heating_preset=PRESET_BY_TEMP,
@@ -389,7 +422,9 @@ def test_climate_current_temperature_stale_source_shows_fallback_not_none():
     )
     sensor_state = MagicMock()
     sensor_state.state = "22.0"
-    sensor_state.last_changed = datetime.datetime.now(datetime.UTC) - datetime.timedelta(seconds=300)
+    sensor_state.last_changed = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
+        seconds=300
+    )
     coord.hass.states.get.return_value = sensor_state
     ent = AutotermClimate.__new__(AutotermClimate)
     ent.coordinator = coord
@@ -405,6 +440,7 @@ def test_hvac_mode_change_blocked_when_running():
     from homeassistant.components.climate import HVACMode
 
     from custom_components.autoterm.climate import AutotermClimate
+
     st = _make_status(status1=3, status2=0)  # running
     coord = _make_coordinator(status=st)
     ent = AutotermClimate.__new__(AutotermClimate)
@@ -420,6 +456,7 @@ def test_hvac_mode_change_allowed_when_idle():
     from homeassistant.components.climate import HVACMode
 
     from custom_components.autoterm.climate import AutotermClimate
+
     st = _make_status(status1=0)  # idle
     coord = _make_coordinator(status=st)
     coord.client.send_fan_only = AsyncMock(return_value=True)
@@ -434,6 +471,7 @@ def test_hvac_mode_change_allowed_when_idle():
 
 def test_preset_change_blocked_when_running():
     from custom_components.autoterm.climate import AutotermClimate
+
     st = _make_status(status1=3, status2=0)  # running
     coord = _make_coordinator(heating_preset=PRESET_BY_TEMP, status=st)
     coord.client.send_write_settings = AsyncMock(return_value=True)
@@ -449,6 +487,7 @@ def test_preset_change_blocked_when_running():
 
 def test_preset_change_allowed_when_idle():
     from custom_components.autoterm.climate import AutotermClimate
+
     st = _make_status(status1=0)  # idle
     coord = _make_coordinator(heating_preset=PRESET_BY_TEMP, status=st)
     coord.client.send_write_settings = AsyncMock(return_value=True)
@@ -464,6 +503,7 @@ def test_preset_change_allowed_when_idle():
 
 def test_temp_source_change_allowed_when_running():
     from custom_components.autoterm.select import AutotermTempSourceSelect
+
     st = _make_status(status1=3, status2=0, ext_temp=5)
     coord = _make_coordinator(
         heating_preset=PRESET_BY_TEMP,
@@ -493,7 +533,9 @@ def test_apply_settings_mode04_sets_by_power_on_first_read():
 def test_apply_settings_mode02_sets_by_temp_on_first_read():
     coord = _make_coordinator(heating_preset=PRESET_BY_POWER)
     coord._initial_settings_applied = False
-    coord._apply_settings(_make_settings(mode=START_MODE_BY_CONTROLLER_TEMP, setpoint=22, power_level=3))
+    coord._apply_settings(
+        _make_settings(mode=START_MODE_BY_CONTROLLER_TEMP, setpoint=22, power_level=3)
+    )
     assert coord.heating_preset == PRESET_BY_TEMP
     assert coord.target_temp == 22.0
 
@@ -527,6 +569,7 @@ def test_apply_settings_always_syncs_power_level():
 
 def test_start_heat_by_temp_uses_mode_0x02():
     from custom_components.autoterm.climate import AutotermClimate
+
     st = _make_status(status1=0)
     coord = _make_coordinator(heating_preset=PRESET_BY_TEMP, status=st)
     coord.client.send_start = AsyncMock(return_value=True)
@@ -543,6 +586,7 @@ def test_start_heat_by_temp_uses_mode_0x02():
 
 def test_start_heat_by_power_uses_mode_0x04():
     from custom_components.autoterm.climate import AutotermClimate
+
     st = _make_status(status1=0)
     coord = _make_coordinator(heating_preset=PRESET_BY_POWER, status=st)
     coord.client.send_start = AsyncMock(return_value=True)

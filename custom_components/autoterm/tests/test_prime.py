@@ -17,11 +17,9 @@ import pytest
 
 from custom_components.autoterm.codec import HeaterStatus
 from custom_components.autoterm.prime import (
-    PRIME_COOLING,
     PRIME_FAILED_LOCKOUT,
     PRIME_FAILED_MAX_ATTEMPTS,
     PRIME_FAILED_NOT_IDLE,
-    PRIME_LIT,
     PRIME_SUCCESS,
     PrimeResult,
     prime_fuel,
@@ -93,6 +91,7 @@ def test_error13_retry_until_max_attempts(mock_sleep):
     Expected: prime_fuel returns MAX_ATTEMPTS after exhausting max_attempts.
     Error 13 retries MUST wait for cooldown; no shortcuts.
     """
+
     # ambient_k = 20 + 273 = 293; flame_k stays at 293 (no light-off)
     # Each attempt:
     #   - Inner poll: status1=4, err=0x0D  (ECU shutdown, error 13)
@@ -102,7 +101,7 @@ def test_error13_retry_until_max_attempts(mock_sleep):
         return [
             make_status(4, error=0x0D),  # inner loop: shutdown with err 13
             make_status(0, error=0x0D),  # settle poll
-            make_status(0),              # wait_for_idle → idle
+            make_status(0),  # wait_for_idle → idle
         ]
 
     max_attempts = 3
@@ -115,16 +114,18 @@ def test_error13_retry_until_max_attempts(mock_sleep):
     coord = make_mock_coordinator()
     hass = make_mock_hass()
 
-    result = asyncio.run(prime_fuel(
-        client,
-        hass,
-        "test-entry-id",
-        coord,
-        max_attempts=max_attempts,
-        stabilize_seconds=0,
-        _startup_window=60.0,
-        _cooldown_max_wait=30.0,
-    ))
+    result = asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            max_attempts=max_attempts,
+            stabilize_seconds=0,
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert result == PrimeResult.MAX_ATTEMPTS
     assert coord.prime_status == PRIME_FAILED_MAX_ATTEMPTS
@@ -137,8 +138,7 @@ def test_error13_retry_until_max_attempts(mock_sleep):
 
     # HA events: one FINISHED event fired
     finished_events = [
-        c for c in hass.bus.fire.call_args_list
-        if c.args[0] == "autoterm_prime_finished"
+        c for c in hass.bus.fire.call_args_list if c.args[0] == "autoterm_prime_finished"
     ]
     assert len(finished_events) == 1
     assert finished_events[0].args[1]["result"] == PrimeResult.MAX_ATTEMPTS.value
@@ -154,25 +154,27 @@ def test_light_off_success(mock_sleep):
     # flame_k = 400K > 333K → confirmed
     poll_responses = [
         make_status(0, heater_temp=20, flame_k=293),  # preflight: idle
-        make_status(3, flame_k=400),                   # inner loop: running, lit!
-        make_status(0),                                # wait_for_idle after stop
+        make_status(3, flame_k=400),  # inner loop: running, lit!
+        make_status(0),  # wait_for_idle after stop
     ]
 
     client = make_mock_client(poll_responses)
     coord = make_mock_coordinator()
     hass = make_mock_hass()
 
-    result = asyncio.run(prime_fuel(
-        client,
-        hass,
-        "test-entry-id",
-        coord,
-        max_attempts=5,
-        flame_confirm_delta=40,
-        stabilize_seconds=0,  # no stabilise hold
-        _startup_window=60.0,
-        _cooldown_max_wait=30.0,
-    ))
+    result = asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            max_attempts=5,
+            flame_confirm_delta=40,
+            stabilize_seconds=0,  # no stabilise hold
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert result == PrimeResult.SUCCESS
     assert coord.prime_status == PRIME_SUCCESS
@@ -183,8 +185,7 @@ def test_light_off_success(mock_sleep):
 
     # FINISHED event with result=success
     finished_events = [
-        c for c in hass.bus.fire.call_args_list
-        if c.args[0] == "autoterm_prime_finished"
+        c for c in hass.bus.fire.call_args_list if c.args[0] == "autoterm_prime_finished"
     ]
     assert len(finished_events) == 1
     assert finished_events[0].args[1]["result"] == PrimeResult.SUCCESS.value
@@ -201,21 +202,29 @@ def test_light_off_below_threshold_does_not_confirm(mock_sleep):
     # Poll 2: flame_k=300 (< 333) → not confirmed, continue
     # Poll 3: flame_k=400 (> 333) → confirmed
     poll_responses = [
-        make_status(0, heater_temp=20, flame_k=293),   # preflight
-        make_status(3, flame_k=300),                    # running but cold — not confirmed
-        make_status(3, flame_k=400),                    # running, confirmed
-        make_status(0),                                 # wait_for_idle
+        make_status(0, heater_temp=20, flame_k=293),  # preflight
+        make_status(3, flame_k=300),  # running but cold — not confirmed
+        make_status(3, flame_k=400),  # running, confirmed
+        make_status(0),  # wait_for_idle
     ]
 
     client = make_mock_client(poll_responses)
     coord = make_mock_coordinator()
     hass = make_mock_hass()
 
-    result = asyncio.run(prime_fuel(
-        client, hass, "test-entry-id", coord,
-        max_attempts=2, flame_confirm_delta=40, stabilize_seconds=0,
-        _startup_window=60.0, _cooldown_max_wait=30.0,
-    ))
+    result = asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            max_attempts=2,
+            flame_confirm_delta=40,
+            stabilize_seconds=0,
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert result == PrimeResult.SUCCESS
 
@@ -227,21 +236,27 @@ def test_lockout_aborts_immediately_no_retry(mock_sleep):
     Expected: prime_fuel returns LOCKOUT immediately — does NOT retry.
     """
     poll_responses = [
-        make_status(0, heater_temp=20),        # preflight: idle
-        make_status(4, error=0),               # inner loop: ECU shutdown
-        make_status(0, error=33),              # settle poll: lockout code
-        make_status(0),                        # wait_for_idle in lockout handler
+        make_status(0, heater_temp=20),  # preflight: idle
+        make_status(4, error=0),  # inner loop: ECU shutdown
+        make_status(0, error=33),  # settle poll: lockout code
+        make_status(0),  # wait_for_idle in lockout handler
     ]
 
     client = make_mock_client(poll_responses)
     coord = make_mock_coordinator()
     hass = make_mock_hass()
 
-    result = asyncio.run(prime_fuel(
-        client, hass, "test-entry-id", coord,
-        max_attempts=6,  # high cap — must abort on first lockout regardless
-        _startup_window=60.0, _cooldown_max_wait=30.0,
-    ))
+    result = asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            max_attempts=6,  # high cap — must abort on first lockout regardless
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert result == PrimeResult.LOCKOUT
     assert coord.prime_status == PRIME_FAILED_LOCKOUT
@@ -252,8 +267,7 @@ def test_lockout_aborts_immediately_no_retry(mock_sleep):
     assert client.send_stop.call_count == 1
 
     finished_events = [
-        c for c in hass.bus.fire.call_args_list
-        if c.args[0] == "autoterm_prime_finished"
+        c for c in hass.bus.fire.call_args_list if c.args[0] == "autoterm_prime_finished"
     ]
     assert len(finished_events) == 1
     payload = finished_events[0].args[1]
@@ -268,23 +282,29 @@ def test_lockout_during_warmup_aborts_immediately(mock_sleep):
     Expected: immediate LOCKOUT abort — does NOT retry.
     """
     poll_responses = [
-        make_status(0, heater_temp=20),      # preflight: idle
-        make_status(2, error=33),            # warmup: lockout flag in error field
-        make_status(0),                      # wait_for_idle in lockout handler
+        make_status(0, heater_temp=20),  # preflight: idle
+        make_status(2, error=33),  # warmup: lockout flag in error field
+        make_status(0),  # wait_for_idle in lockout handler
     ]
 
     client = make_mock_client(poll_responses)
     coord = make_mock_coordinator()
     hass = make_mock_hass()
 
-    result = asyncio.run(prime_fuel(
-        client, hass, "test-entry-id", coord,
-        max_attempts=6,
-        _startup_window=60.0, _cooldown_max_wait=30.0,
-    ))
+    result = asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            max_attempts=6,
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert result == PrimeResult.LOCKOUT
-    assert client.send_start.call_count == 1   # only one attempt
+    assert client.send_start.call_count == 1  # only one attempt
 
 
 @patch("custom_components.autoterm.prime.asyncio.sleep", new_callable=AsyncMock)
@@ -294,30 +314,35 @@ def test_other_fault_stops_and_aborts(mock_sleep):
     Expected: prime_fuel sends STOP, waits for cooldown, returns FAULT.  No retry.
     """
     poll_responses = [
-        make_status(0, heater_temp=20),    # preflight
-        make_status(4, error=0),           # ECU shutdown
-        make_status(0, error=3),           # settle poll: fault 3
-        make_status(0),                    # wait_for_idle
+        make_status(0, heater_temp=20),  # preflight
+        make_status(4, error=0),  # ECU shutdown
+        make_status(0, error=3),  # settle poll: fault 3
+        make_status(0),  # wait_for_idle
     ]
 
     client = make_mock_client(poll_responses)
     coord = make_mock_coordinator()
     hass = make_mock_hass()
 
-    result = asyncio.run(prime_fuel(
-        client, hass, "test-entry-id", coord,
-        max_attempts=6,
-        _startup_window=60.0, _cooldown_max_wait=30.0,
-    ))
+    result = asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            max_attempts=6,
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert result == PrimeResult.FAULT
 
-    assert client.send_start.call_count == 1   # no retry on non-retryable fault
-    assert client.send_stop.call_count == 1    # clean stop
+    assert client.send_start.call_count == 1  # no retry on non-retryable fault
+    assert client.send_stop.call_count == 1  # clean stop
 
     finished_events = [
-        c for c in hass.bus.fire.call_args_list
-        if c.args[0] == "autoterm_prime_finished"
+        c for c in hass.bus.fire.call_args_list if c.args[0] == "autoterm_prime_finished"
     ]
     assert len(finished_events) == 1
     assert finished_events[0].args[1]["result"] == PrimeResult.FAULT.value
@@ -331,20 +356,26 @@ def test_fault_during_warmup_stops_and_aborts(mock_sleep):
     Expected: FAULT, no retry.
     """
     poll_responses = [
-        make_status(0, heater_temp=20),    # preflight
-        make_status(2, error=9),           # warmup: glow plug fault
-        make_status(0),                    # wait_for_idle
+        make_status(0, heater_temp=20),  # preflight
+        make_status(2, error=9),  # warmup: glow plug fault
+        make_status(0),  # wait_for_idle
     ]
 
     client = make_mock_client(poll_responses)
     coord = make_mock_coordinator()
     hass = make_mock_hass()
 
-    result = asyncio.run(prime_fuel(
-        client, hass, "test-entry-id", coord,
-        max_attempts=6,
-        _startup_window=60.0, _cooldown_max_wait=30.0,
-    ))
+    result = asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            max_attempts=6,
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert result == PrimeResult.FAULT
     assert client.send_start.call_count == 1
@@ -357,17 +388,23 @@ def test_heater_not_idle_rejected(mock_sleep):
     Expected: NOT_IDLE returned immediately; no START sent.
     """
     poll_responses = [
-        make_status(3, flame_k=600),   # already running
+        make_status(3, flame_k=600),  # already running
     ]
 
     client = make_mock_client(poll_responses)
     coord = make_mock_coordinator()
     hass = make_mock_hass()
 
-    result = asyncio.run(prime_fuel(
-        client, hass, "test-entry-id", coord,
-        _startup_window=60.0, _cooldown_max_wait=30.0,
-    ))
+    result = asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert result == PrimeResult.NOT_IDLE
     assert coord.prime_status == PRIME_FAILED_NOT_IDLE
@@ -384,25 +421,31 @@ def test_error13_then_success_on_second_attempt(mock_sleep):
     poll_responses = [
         make_status(0, heater_temp=20, flame_k=293),  # preflight
         # Attempt 1: error 13
-        make_status(4, error=0x0D),                   # shutdown + err13
-        make_status(0, error=0x0D),                   # settle
-        make_status(0),                               # wait_for_idle
+        make_status(4, error=0x0D),  # shutdown + err13
+        make_status(0, error=0x0D),  # settle
+        make_status(0),  # wait_for_idle
         # Attempt 2: light-off
-        make_status(3, flame_k=500),                  # running + flame 500K > 333K → lit
-        make_status(0),                               # wait_for_idle after stop
+        make_status(3, flame_k=500),  # running + flame 500K > 333K → lit
+        make_status(0),  # wait_for_idle after stop
     ]
 
     client = make_mock_client(poll_responses)
     coord = make_mock_coordinator()
     hass = make_mock_hass()
 
-    result = asyncio.run(prime_fuel(
-        client, hass, "test-entry-id", coord,
-        max_attempts=3,
-        flame_confirm_delta=40,
-        stabilize_seconds=0,
-        _startup_window=60.0, _cooldown_max_wait=30.0,
-    ))
+    result = asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            max_attempts=3,
+            flame_confirm_delta=40,
+            stabilize_seconds=0,
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert result == PrimeResult.SUCCESS
     assert client.send_start.call_count == 2
@@ -423,11 +466,17 @@ def test_priming_flag_cleared_on_success(mock_sleep):
     hass = make_mock_hass()
 
     coord._priming = True  # simulate service handler having set this
-    asyncio.run(prime_fuel(
-        client, hass, "test-entry-id", coord,
-        stabilize_seconds=0,
-        _startup_window=60.0, _cooldown_max_wait=30.0,
-    ))
+    asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            stabilize_seconds=0,
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert coord._priming is False  # finally block must clear it
 
@@ -447,11 +496,17 @@ def test_priming_flag_cleared_on_fault(mock_sleep):
     hass = make_mock_hass()
 
     coord._priming = True
-    asyncio.run(prime_fuel(
-        client, hass, "test-entry-id", coord,
-        max_attempts=2,
-        _startup_window=60.0, _cooldown_max_wait=30.0,
-    ))
+    asyncio.run(
+        prime_fuel(
+            client,
+            hass,
+            "test-entry-id",
+            coord,
+            max_attempts=2,
+            _startup_window=60.0,
+            _cooldown_max_wait=30.0,
+        )
+    )
 
     assert coord._priming is False
 
@@ -481,10 +536,16 @@ def test_cancellation_sends_stop(mock_sleep):
     hass = make_mock_hass()
 
     with pytest.raises(asyncio.CancelledError):
-        asyncio.run(prime_fuel(
-            client, hass, "test-entry-id", coord,
-            _startup_window=60.0, _cooldown_max_wait=30.0,
-        ))
+        asyncio.run(
+            prime_fuel(
+                client,
+                hass,
+                "test-entry-id",
+                coord,
+                _startup_window=60.0,
+                _cooldown_max_wait=30.0,
+            )
+        )
 
     # STOP must have been sent during cleanup.
     assert client.send_stop.call_count >= 1

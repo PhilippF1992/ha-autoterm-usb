@@ -298,11 +298,11 @@ def test_build_set_temp_structure():
         frame = build_set_temp(temp)
         assert frame[0] == 0xAA
         assert frame[1] == 0x03
-        assert frame[2] == 0x01          # payload_len=1
+        assert frame[2] == 0x01  # payload_len=1
         assert frame[3] == 0x00
-        assert frame[4] == 0x11          # cmd = SET_TEMP
-        assert frame[5] == temp          # single-byte payload
-        assert len(frame) == 8           # 5 header + 1 payload + 2 CRC
+        assert frame[4] == 0x11  # cmd = SET_TEMP
+        assert frame[5] == temp  # single-byte payload
+        assert len(frame) == 8  # 5 header + 1 payload + 2 CRC
         assert crc16(frame[:-2]) == frame[-2:]
 
 
@@ -336,15 +336,15 @@ def test_build_write_settings_structure():
     frame = build_write_settings(mode=0x04, setpoint=15, ventilation=0, power_level=5)
     assert frame[0] == 0xAA
     assert frame[1] == 0x03
-    assert frame[2] == 0x06     # payload_len=6
+    assert frame[2] == 0x06  # payload_len=6
     assert frame[3] == 0x00
-    assert frame[4] == 0x02     # cmd = GET_SETTINGS (write variant)
-    assert frame[5] == 0xFF     # reserved[0]
-    assert frame[6] == 0xFF     # reserved[1]
-    assert frame[7] == 0x04     # mode=by-power
-    assert frame[8] == 0x0F     # setpoint=15°C
-    assert frame[9] == 0x00     # ventilation=off
-    assert frame[10] == 0x05    # power_level=5
+    assert frame[4] == 0x02  # cmd = GET_SETTINGS (write variant)
+    assert frame[5] == 0xFF  # reserved[0]
+    assert frame[6] == 0xFF  # reserved[1]
+    assert frame[7] == 0x04  # mode=by-power
+    assert frame[8] == 0x0F  # setpoint=15°C
+    assert frame[9] == 0x00  # ventilation=off
+    assert frame[10] == 0x05  # power_level=5
     assert len(frame) == 13
     assert crc16(frame[:-2]) == frame[-2:]
 
@@ -370,7 +370,7 @@ def test_parse_settings_from_start_response():
     assert s is not None
     assert isinstance(s, SettingsPayload)
     assert s.mode == 0x04
-    assert s.setpoint == 0x0F   # 15°C
+    assert s.setpoint == 0x0F  # 15°C
     assert s.ventilation == 0x01
     assert s.power_level == 0x02
 
@@ -387,7 +387,7 @@ def test_parse_settings_roundtrip_write():
     s = parse_settings(frame)
     assert s is not None
     assert s.mode == 0x01
-    assert s.setpoint == 0x14   # 20°C
+    assert s.setpoint == 0x14  # 20°C
     assert s.ventilation == 0x00
     assert s.power_level == 0x07
 
@@ -424,13 +424,13 @@ def test_build_fan_only_structure():
     frame = build_fan_only(5)
     assert frame[0] == 0xAA
     assert frame[1] == 0x03
-    assert frame[2] == 0x04     # payload_len=4
+    assert frame[2] == 0x04  # payload_len=4
     assert frame[3] == 0x00
-    assert frame[4] == 0x23     # cmd = FAN_ONLY
-    assert frame[5] == 0xFF     # reserved
-    assert frame[6] == 0xFF     # reserved
-    assert frame[7] == 0x05     # fan_level=5
-    assert frame[8] == 0x0F     # last byte per prclm (k3mpaxl uses 0xFF)
+    assert frame[4] == 0x23  # cmd = FAN_ONLY
+    assert frame[5] == 0xFF  # reserved
+    assert frame[6] == 0xFF  # reserved
+    assert frame[7] == 0x05  # fan_level=5
+    assert frame[8] == 0x0F  # last byte per prclm (k3mpaxl uses 0xFF)
     assert len(frame) == 11
     assert crc16(frame[:-2]) == frame[-2:]
 

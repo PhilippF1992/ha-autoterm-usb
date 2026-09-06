@@ -15,13 +15,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from enum import Enum
+from enum import StrEnum
 from typing import TYPE_CHECKING
 
 from .client import AutotermClient
 from .codec import HeaterStatus
 from .const import (
-    DOMAIN,
     FAULT_CODES,
     FAULT_LOCKOUT,
     STOP_RESEND_INTERVAL,
@@ -50,7 +49,7 @@ PRIME_FAILED_CANCELLED = "failed:cancelled"
 # ── Result enum ───────────────────────────────────────────────────────────────
 
 
-class PrimeResult(str, Enum):
+class PrimeResult(StrEnum):
     SUCCESS = "success"
     MAX_ATTEMPTS = "failed:max_attempts"
     LOCKOUT = "failed:err33"
@@ -66,9 +65,9 @@ EVENT_PRIME_FINISHED = "autoterm_prime_finished"
 
 # ── Internal timing constants ─────────────────────────────────────────────────
 
-_POLL_INTERVAL = 1.5     # seconds between polls in the inner monitoring loop
-_STARTUP_WINDOW = 600    # maximum seconds to wait for ignition per attempt
-_COOLDOWN_MAX_WAIT = 300 # maximum seconds to wait for idle after stop
+_POLL_INTERVAL = 1.5  # seconds between polls in the inner monitoring loop
+_STARTUP_WINDOW = 600  # maximum seconds to wait for ignition per attempt
+_COOLDOWN_MAX_WAIT = 300  # maximum seconds to wait for idle after stop
 
 
 # ── Event helpers ─────────────────────────────────────────────────────────────
@@ -276,7 +275,7 @@ async def prime_fuel(
                     await asyncio.sleep(3)  # let ECU settle the error register
                     final = await client.poll_status()
                     # Prefer the post-settle read; fall back to the shutdown frame.
-                    fault_code = (final.error if final is not None else st.error)
+                    fault_code = final.error if final is not None else st.error
                     if fault_code == 0 and st.error != 0:
                         fault_code = st.error
                     if final is not None:
@@ -305,15 +304,11 @@ async def prime_fuel(
             # ── Evaluate the fault after this attempt ─────────────────────────
 
             if fault_code == FAULT_LOCKOUT:
-                _LOGGER.error(
-                    "Prime: LOCKOUT — manual unlock required; NOT retrying"
-                )
+                _LOGGER.error("Prime: LOCKOUT — manual unlock required; NOT retrying")
                 coordinator.prime_status = PRIME_FAILED_LOCKOUT
                 await client.send_stop()
                 await _wait_for_idle(client, max_wait=_cooldown_max_wait, resend_stop=True)
-                _fire_finished(
-                    hass, entry_id, PrimeResult.LOCKOUT, attempt, last_st, FAULT_LOCKOUT
-                )
+                _fire_finished(hass, entry_id, PrimeResult.LOCKOUT, attempt, last_st, FAULT_LOCKOUT)
                 return PrimeResult.LOCKOUT
 
             if fault_code == 0x0D:
@@ -325,9 +320,7 @@ async def prime_fuel(
                     max_attempts,
                 )
                 # Full fan purge before next attempt — do NOT skip this.
-                await _wait_for_idle(
-                    client, max_wait=_cooldown_max_wait, resend_stop=False
-                )
+                await _wait_for_idle(client, max_wait=_cooldown_max_wait, resend_stop=False)
                 await asyncio.sleep(5)
                 continue  # next attempt
 
@@ -341,9 +334,7 @@ async def prime_fuel(
                 coordinator.prime_status = PRIME_FAILED_FAULT
                 await client.send_stop()
                 await _wait_for_idle(client, max_wait=_cooldown_max_wait, resend_stop=True)
-                _fire_finished(
-                    hass, entry_id, PrimeResult.FAULT, attempt, last_st, fault_code
-                )
+                _fire_finished(hass, entry_id, PrimeResult.FAULT, attempt, last_st, fault_code)
                 return PrimeResult.FAULT
 
             # fault_code is None or 0 → startup window expired without result.
@@ -397,9 +388,7 @@ async def prime_fuel(
         await _wait_for_idle(client, max_wait=_cooldown_max_wait, resend_stop=True)
 
         coordinator.prime_status = PRIME_SUCCESS
-        _LOGGER.info(
-            "Prime: SUCCESS — fuel line primed after %d attempt(s)", attempt
-        )
+        _LOGGER.info("Prime: SUCCESS — fuel line primed after %d attempt(s)", attempt)
         _fire_finished(hass, entry_id, PrimeResult.SUCCESS, attempt, last_st)
         return PrimeResult.SUCCESS
 

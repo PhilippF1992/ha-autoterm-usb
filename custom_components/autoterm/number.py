@@ -29,10 +29,12 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: AutotermCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([
-        AutotermPowerLevel(coordinator, entry),
-        AutotermFanLevel(coordinator, entry),
-    ])
+    async_add_entities(
+        [
+            AutotermPowerLevel(coordinator, entry),
+            AutotermFanLevel(coordinator, entry),
+        ]
+    )
 
 
 class AutotermPowerLevel(CoordinatorEntity[AutotermCoordinator], NumberEntity):
@@ -90,9 +92,7 @@ class AutotermPowerLevel(CoordinatorEntity[AutotermCoordinator], NumberEntity):
             if not ok:
                 _LOGGER.warning("Failed to update power level to %d", level)
         else:
-            _LOGGER.debug(
-                "Power level stored as %d; will apply on next start in power mode", level
-            )
+            _LOGGER.debug("Power level stored as %d; will apply on next start in power mode", level)
 
 
 class AutotermFanLevel(CoordinatorEntity[AutotermCoordinator], NumberEntity):
@@ -127,11 +127,7 @@ class AutotermFanLevel(CoordinatorEntity[AutotermCoordinator], NumberEntity):
     @property
     def available(self) -> bool:
         st = self.coordinator.data
-        return (
-            self.coordinator.last_update_success
-            and st is not None
-            and st.is_fan_only
-        )
+        return self.coordinator.last_update_success and st is not None and st.is_fan_only
 
     @property
     def native_value(self) -> float:

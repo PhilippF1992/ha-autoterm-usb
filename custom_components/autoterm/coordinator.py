@@ -69,7 +69,7 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
         self._entry = entry
 
         # ── Mutable heater state (updated by entities + first settings read) ─
-        self.heating_preset: str = PRESET_BY_POWER    # initialised from first settings read
+        self.heating_preset: str = PRESET_BY_POWER  # initialised from first settings read
         self.temp_source: str = TEMP_SOURCE_HA_SENSOR  # HA-side only; never written to heater
         self.target_temp: float = 20.0
         self.power_level: int = DEFAULT_POWER_LEVEL
@@ -77,7 +77,7 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
 
         # ── Internal bookkeeping ──────────────────────────────────────────────
         self._settings: SettingsPayload | None = None
-        self._last_settings_poll: float = 0.0          # monotonic
+        self._last_settings_poll: float = 0.0  # monotonic
         # Prevents periodic settings polls from overwriting a user-selected pending preset
         self._initial_settings_applied: bool = False
         self._consecutive_poll_failures: int = 0
@@ -184,7 +184,7 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
         if self.temp_source == TEMP_SOURCE_EXTERNAL:
             # Note: codec decodes ext_temp as uint8. Sub-zero readings will be
             # misrepresented until signed int8 decoding is added to codec.py.
-            return (st.ext_temp if (st and st.ext_temp is not None) else None)
+            return st.ext_temp if (st and st.ext_temp is not None) else None
 
         if self.temp_source == TEMP_SOURCE_HA_SENSOR:
             source_entity: str | None = self._entry.options.get(CONF_TEMP_SOURCE_ENTITY)

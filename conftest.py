@@ -24,8 +24,11 @@ _stub("homeassistant.config_entries", ConfigEntry=object, ConfigFlow=object, Opt
 _stub(
     "homeassistant.const",
     Platform=types.SimpleNamespace(
-        CLIMATE="climate", SENSOR="sensor", BINARY_SENSOR="binary_sensor",
-        SELECT="select", NUMBER="number",
+        CLIMATE="climate",
+        SENSOR="sensor",
+        BINARY_SENSOR="binary_sensor",
+        SELECT="select",
+        NUMBER="number",
     ),
 )
 _stub("homeassistant.core", HomeAssistant=object, callback=lambda f: f, ServiceCall=object)
@@ -41,7 +44,9 @@ class _FakeDtUtil:
     def utcnow():
         return _datetime.datetime.now(_datetime.UTC)
 
+
 _stub("homeassistant.util.dt", utcnow=_FakeDtUtil.utcnow)
+
 
 # Generic base classes that support subscript (Coordinator[T] etc.)
 class _Subscriptable:
@@ -114,8 +119,11 @@ _stub(
     UnitOfElectricPotential=types.SimpleNamespace(VOLT="V"),
     ATTR_TEMPERATURE="temperature",
     Platform=types.SimpleNamespace(
-        CLIMATE="climate", SENSOR="sensor", BINARY_SENSOR="binary_sensor",
-        SELECT="select", NUMBER="number",
+        CLIMATE="climate",
+        SENSOR="sensor",
+        BINARY_SENSOR="binary_sensor",
+        SELECT="select",
+        NUMBER="number",
     ),
 )
 

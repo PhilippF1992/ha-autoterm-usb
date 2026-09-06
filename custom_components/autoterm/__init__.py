@@ -135,9 +135,7 @@ def _async_register_prime_service(hass: HomeAssistant) -> None:
             )
 
         if coordinator._priming:
-            raise HomeAssistantError(
-                "A prime run is already in progress; wait for it to finish"
-            )
+            raise HomeAssistantError("A prime run is already in progress; wait for it to finish")
 
         coordinator._priming = True
         task = hass.async_create_task(

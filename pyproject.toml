@@ -31,6 +31,8 @@ ignore = [
   "PLR0913",  # too many args (HA config flows have wide signatures)
   "PLR2004",  # magic-value comparisons
   "PLR0911",  # too many returns
+  "PLR0912",  # too many branches (prime_fuel is a state machine)
+  "PLR0915",  # too many statements (prime_fuel is a state machine)
 ]
 
 [tool.ruff.lint.per-file-ignores]

@@ -187,8 +187,7 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
         self.coordinator.heating_preset = preset_mode
         self.async_write_ha_state()
         mode = (
-            START_MODE_BY_CONTROLLER_TEMP if preset_mode == PRESET_BY_TEMP
-            else START_MODE_BY_POWER
+            START_MODE_BY_CONTROLLER_TEMP if preset_mode == PRESET_BY_TEMP else START_MODE_BY_POWER
         )
         await self.coordinator.client.send_write_settings(
             mode=mode,

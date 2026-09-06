@@ -49,8 +49,8 @@ def build(cmd: int, payload: bytes = b"") -> bytes:
 
 # ── Pre-built constant frames (CONFIRMED against real hardware) ───────────────
 
-STATUS_REQ: bytes = build(CMD_STATUS)       # AA 03 00 00 0F 58 7C
-STOP_CMD: bytes = build(CMD_STOP)           # AA 03 00 00 03 5D 7C
+STATUS_REQ: bytes = build(CMD_STATUS)  # AA 03 00 00 0F 58 7C
+STOP_CMD: bytes = build(CMD_STOP)  # AA 03 00 00 03 5D 7C
 GET_SETTINGS_REQ: bytes = build(CMD_GET_SETTINGS)  # AA 03 00 00 02 9D BD
 
 
@@ -266,10 +266,10 @@ def parse_status(frame: bytes) -> HeaterStatus | None:
 class SettingsPayload:
     """Decoded heater settings from a 0x02 response frame."""
 
-    mode: int        # 1=internal, 2=panel, 3=external, 4=by-power
-    setpoint: int    # °C
-    ventilation: int # 0=off, 1=on
-    power_level: int # 1–9
+    mode: int  # 1=internal, 2=panel, 3=external, 4=by-power
+    setpoint: int  # °C
+    ventilation: int  # 0=off, 1=on
+    power_level: int  # 1–9
 
 
 def parse_settings(frame: bytes) -> SettingsPayload | None:

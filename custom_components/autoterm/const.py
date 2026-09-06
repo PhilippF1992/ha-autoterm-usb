@@ -40,10 +40,10 @@ CMD_FAN_ONLY = 0x23
 
 # ── START/SETTINGS frame: mode byte ──────────────────────────────────────────
 
-START_MODE_BY_HEATER_TEMP = 0x01      # by internal heater sensor
+START_MODE_BY_HEATER_TEMP = 0x01  # by internal heater sensor
 START_MODE_BY_CONTROLLER_TEMP = 0x02  # by panel/controller-reported temperature
-START_MODE_BY_EXTERNAL_TEMP = 0x03   # by external DS18B20 sensor
-START_MODE_BY_POWER = 0x04           # CONFIRMED working
+START_MODE_BY_EXTERNAL_TEMP = 0x03  # by external DS18B20 sensor
+START_MODE_BY_POWER = 0x04  # CONFIRMED working
 
 # ── Regulation source strings (used by select entity and coordinator) ─────────
 
@@ -61,14 +61,14 @@ REG_SOURCE_OPTIONS = [
 
 # ── HA preset mode names ──────────────────────────────────────────────────────
 
-PRESET_BY_TEMP  = "By Temperature"
+PRESET_BY_TEMP = "By Temperature"
 PRESET_BY_POWER = "By Power"
 
 # ── Temperature source names (HA-side; all fed as panel temp via 0x02 mode) ──
 
-TEMP_SOURCE_INTERNAL  = "internal"    # feed heater's own intake sensor
-TEMP_SOURCE_EXTERNAL  = "external"    # feed heater's DS18B20 external sensor
-TEMP_SOURCE_HA_SENSOR = "ha_sensor"   # feed configured HA sensor entity
+TEMP_SOURCE_INTERNAL = "internal"  # feed heater's own intake sensor
+TEMP_SOURCE_EXTERNAL = "external"  # feed heater's DS18B20 external sensor
+TEMP_SOURCE_HA_SENSOR = "ha_sensor"  # feed configured HA sensor entity
 
 REG_SOURCE_TO_MODE: dict[str, int] = {
     REG_SOURCE_INTERNAL: START_MODE_BY_HEATER_TEMP,
@@ -95,9 +95,9 @@ PANEL_TEMP_MAX = 60
 
 # ── Coordinator timing ────────────────────────────────────────────────────────
 
-STOP_RESEND_INTERVAL = 10      # re-send STOP every N s during cooldown
-COMMAND_DEBOUNCE = 5           # minimum seconds between start/stop commands
-SETTINGS_READ_INTERVAL = 60    # seconds between periodic settings re-reads from heater
+STOP_RESEND_INTERVAL = 10  # re-send STOP every N s during cooldown
+COMMAND_DEBOUNCE = 5  # minimum seconds between start/stop commands
+SETTINGS_READ_INTERVAL = 60  # seconds between periodic settings re-reads from heater
 
 # ── Primary state codes (status1) ────────────────────────────────────────────
 
