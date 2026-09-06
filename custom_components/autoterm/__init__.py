@@ -55,7 +55,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Initial poll
     await coordinator.async_config_entry_first_refresh()
 
-    # Read current heater settings to initialise reg_source / target_temp / power_level
+    # Read current heater settings to initialise heating_preset / target_temp / power_level
     await coordinator.async_refresh_settings()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator

@@ -86,7 +86,7 @@ AA 04 0A 00 0F [10 bytes payload] [CRC_H] [CRC_L]
 | `[1]` | `status2` | — | Sub-state (see table below) |
 | `[2]` | `error_code` | — | Error/fault code; `0x00` = no error |
 | `[3]` | `heater_temp` | °C direct | Internal sensor (ambient air near heater) |
-| `[4]` | `ext_temp` | °C direct, `0x7F` = no sensor | External sensor (if fitted) |
+| `[4]` | `ext_temp` | °C direct, `0x7F` = no sensor | External sensor (if fitted). Decoded as uint8 — sub-zero readings will be misrepresented until signed int8 decoding is added. |
 | `[5]` | *(unknown)* | — | Always `0x00` observed |
 | `[6]` | `voltage` | ÷ 10 → V | Supply voltage × 10 (e.g. `0x84` = 13.2 V) |
 | `[7]` | `flame_temp_hi` | — | MSB of 16-bit flame sensor value |
@@ -108,6 +108,7 @@ AA 04 0A 00 0F [10 bytes payload] [CRC_H] [CRC_L]
 | `2` | `2` | Ignition attempt 1 |
 | `2` | `3` | Ignition attempt 2 |
 | `2` | `4` | Heating combustion chamber |
+| `2` | `6` | *(observed live 2026-09-04 — ignition glow; undocumented in manual)* |
 | `2` | `7` | *(observed between 2.2 and 2.3 — undocumented)* |
 | `3` | `0` | Running / heating |
 | `3` | `35` | Fan-only (ventilation mode) |
@@ -116,14 +117,36 @@ AA 04 0A 00 0F [10 bytes payload] [CRC_H] [CRC_L]
 
 #### Error codes (`error_code`, offset `[2]`)
 
-| Code | Meaning |
-|---|---|
-| `0x00` | No error |
-| `0x0D` (13) | Ignition failed / fuel not yet primed (normal on first cold start; retry usually succeeds once fuel reaches the burner) |
-| `0x1E` (30) | Observed in idle after a failed ignition attempt — may be a cumulative start-attempt counter rather than a live fault |
+| Code | Title | Notes |
+|---|---|---|
+| `0` | No error | — |
+| `1` | Overheating (heat exchanger) | Blocked air flow or faulty overheat sensor |
+| `2` | Overheating (intake sensor) | Control unit overheated; ensure purge completes |
+| `3` | Flame failure during operation | Air in fuel line, insufficient fuel, pump fault |
+| `4` | Failure to ignite | Empty tank, air in line, blocked filter/pump |
+| `5` | Faulty HX temp sensor | Short/open circuit in sensor or wiring |
+| `6` | Faulty control-unit sensor | Internal sensor fault; replace control unit |
+| `7` | Overheat sensor open circuit | Defective sensor or broken wire |
+| `8` | Start failure | Fuel-supply fault; see code 29 |
+| `9` | Faulty glow plug | Short/open/worn glow plug |
+| `10` | Glow plug circuit fault | Wiring or control-unit driver fault |
+| `11` | Flame indicator fault | Sensor malfunction or wiring fault |
+| `12` | Temp sensor / flame fault | See code 5 |
+| `13` | Does not start (2 attempts) | No fuel, air in line, blocked filter/exhaust. Normal on first cold start — clears on retry once fuel reaches burner. |
+| `16` | Undervoltage | Battery low or wiring voltage drop |
+| `17` | Overvoltage | Charging fault or wrong supply |
+| `20` | Control unit fault | Internal control unit fault |
+| `27` | Fan motor not rotating | Blocked fan or faulty motor |
+| `28` | Fan overspeed / wrong RPM | Motor or speed-sensor fault |
+| `29` | Flame out / fuel fault | Air in fuel, pump fault, or empty tank |
+| `30` | No communication | Damaged harness or broken data wire. May appear after HA/serial restart — clear by retrying. |
+| `31` | Overheating (outlet sensor) | Restricted hot-air flow or sensor fault |
+| `32` | Temp sensor fault (won't start) | Faulty sensor; heater won't ignite until resolved |
+| `33` | **LOCKOUT** | Repeated critical faults; **manual unlock required** (see Autoterm manual) |
+| `34` | Communication fault | Harness/connector/data-wire fault. May appear after HA restart — clear by retrying. |
 
-> Error code 13 source: Autoterm/Planar installation manual (DE). As noted in the manual,
-> this typically clears on the next start attempt once fuel has reached the heater.
+> Source: Autoterm/Planar installation manual (DE). Codes 13, 30, 34 are treated as retryable
+> in the integration (can restart without clearing first).
 
 ---
 
@@ -161,10 +184,15 @@ AA 03 06 00 01 FF FF [mode] [setpoint] [ventilation] [power_level] [CRC_H] [CRC_
 |---|---|---|
 | `[0]` | *(reserved)* | `0xFF` |
 | `[1]` | *(reserved)* | `0xFF` |
-| `[2]` | `mode` | `0x01`=by heater temp, `0x02`=by controller temp, `0x03`=by external temp, `0x04`=by power |
-| `[3]` | `setpoint` | Temperature in °C (ignored when mode=4) |
+| `[2]` | `mode` | `0x01`=by heater temp, `0x02`=by controller/panel temp, `0x03`=by external temp, `0x04`=by power |
+| `[3]` | `setpoint` | Target temperature in °C (ignored when mode=4) |
 | `[4]` | `ventilation` | `0x00`=off, `0x01`=on |
-| `[5]` | `power_level` | `0`–`9` (0=lowest, 9=highest) |
+| `[5]` | `power_level` | `1`–`9` |
+
+> **Integration note:** The integration always starts in `mode=0x02` (by controller/panel temp)
+> for temperature-based heating. HA feeds the selected temperature source (internal, external,
+> or an HA sensor entity) as panel temp via `0x11 SET_TEMP` at every poll cycle. This avoids
+> the wire-level restriction that the temp source cannot be changed while running.
 
 **Confirmed working frame — mode=by-power, level=2, setpoint=15 °C:**
 ```
@@ -178,16 +206,24 @@ AA 04 06 00 01 00 78 04 0F 01 02 E3 4E
 
 ---
 
-### GET SETTINGS — `0x02`
+### GET / WRITE SETTINGS — `0x02`
 
-Read current heater settings (no payload = read; with payload = write new settings).
+Without payload: reads current settings. With 6-byte payload: writes new settings.
 
 **Read request (7 bytes):**
 ```
 AA 03 00 00 02 9D BD
 ```
 
-**Response payload layout** (same 6-byte format as START payload, offsets 2–5):
+**Write request (13 bytes):**
+```
+AA 03 06 00 02 00 78 [mode] [setpoint] [ventilation] [power_level] [CRC_H] [CRC_L]
+```
+
+The payload layout is the same as START bytes `[0]–[5]`, with the first two bytes `0x00 0x78`
+(observed in the response echo) instead of `0xFF 0xFF`.
+
+**Response payload layout** (same 6-byte format as START payload):
 
 | Offset | Field |
 |---|---|
@@ -196,6 +232,46 @@ AA 03 00 00 02 9D BD
 | `[3]` | setpoint (°C) |
 | `[4]` | ventilation |
 | `[5]` | power_level |
+
+---
+
+### SET_TEMP — `0x11`
+
+Sends the current measured temperature to the heater as the "panel/controller temperature".
+Used for continuous panel-temp injection — sent at every poll cycle (~1 Hz) when operating in
+`mode=0x02` (by controller temp).
+
+**Request (8 bytes):**
+```
+AA 03 01 00 11 [temp] [CRC_H] [CRC_L]
+```
+
+**Payload:**
+
+| Byte | Field | Notes |
+|---|---|---|
+| `[0]` | `temp` | Temperature in °C as a single byte. Encoded as `temp_c & 0xFF` (2's complement for sub-zero). -30 → `0xE2`. |
+
+**Response:** acknowledged with a 7-byte frame (same structure as STOP/STATUS ack).
+
+> **Range:** Protocol documentation does not specify the valid range for `0x11`. The integration
+> clamps to `[-30, 60]` as a conservative safety guard. Confirmed working on live hardware.
+
+---
+
+### FAN ONLY — `0x23`
+
+Starts ventilation-only mode (no combustion). Fan speed is set in the payload.
+
+**Request (8 bytes):**
+```
+AA 03 01 00 23 [fan_level] [CRC_H] [CRC_L]
+```
+
+> **PORTED-BUT-UNVERIFIED:** This command was ported from `prclm/AutotermHeaterController`
+> (4D/44D) and `k3mpaxl/pekaway-ha-autoterm` (2D). The k3mpaxl implementation uses `0xFF`
+> as the last payload byte; prclm uses `0x0F`. We follow prclm as 4D-specific. This command
+> has **not been confirmed on real Air 4D hardware**.
 
 ---
 
