@@ -69,7 +69,9 @@ _stub("homeassistant.components")
 _stub(
     "homeassistant.components.climate",
     ClimateEntity=object,
-    ClimateEntityFeature=types.SimpleNamespace(TARGET_TEMPERATURE=1, TURN_ON=512, TURN_OFF=1024),
+    ClimateEntityFeature=types.SimpleNamespace(
+        TARGET_TEMPERATURE=1, TURN_ON=512, TURN_OFF=1024, PRESET_MODE=16
+    ),
     HVACAction=types.SimpleNamespace(
         OFF="off",
         IDLE="idle",
@@ -189,6 +191,11 @@ _stub(
     REG_SOURCE_OPTIONS=["internal", "panel", "external", "power"],
     REG_SOURCE_TO_MODE=_REG_SOURCE_TO_MODE,
     MODE_TO_REG_SOURCE=_MODE_TO_REG_SOURCE,
+    PRESET_BY_TEMP="By Temperature",
+    PRESET_BY_POWER="By Power",
+    TEMP_SOURCE_INTERNAL="internal",
+    TEMP_SOURCE_EXTERNAL="external",
+    TEMP_SOURCE_HA_SENSOR="ha_sensor",
 )
 
 import os as _os  # noqa: E402

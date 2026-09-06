@@ -59,6 +59,17 @@ REG_SOURCE_OPTIONS = [
     REG_SOURCE_POWER,
 ]
 
+# ── HA preset mode names ──────────────────────────────────────────────────────
+
+PRESET_BY_TEMP  = "By Temperature"
+PRESET_BY_POWER = "By Power"
+
+# ── Temperature source names (HA-side; all fed as panel temp via 0x02 mode) ──
+
+TEMP_SOURCE_INTERNAL  = "internal"    # feed heater's own intake sensor
+TEMP_SOURCE_EXTERNAL  = "external"    # feed heater's DS18B20 external sensor
+TEMP_SOURCE_HA_SENSOR = "ha_sensor"   # feed configured HA sensor entity
+
 REG_SOURCE_TO_MODE: dict[str, int] = {
     REG_SOURCE_INTERNAL: START_MODE_BY_HEATER_TEMP,
     REG_SOURCE_PANEL: START_MODE_BY_CONTROLLER_TEMP,

@@ -24,14 +24,15 @@ from .const import (
     DEFAULT_POWER_LEVEL,
     DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
-    MODE_TO_REG_SOURCE,
     PANEL_TEMP_MAX,
     PANEL_TEMP_MIN,
-    REG_SOURCE_PANEL,
-    REG_SOURCE_POWER,
-    REG_SOURCE_TO_MODE,
+    PRESET_BY_POWER,
+    PRESET_BY_TEMP,
     SETTINGS_READ_INTERVAL,
-    START_MODE_BY_HEATER_TEMP,
+    START_MODE_BY_POWER,
+    TEMP_SOURCE_EXTERNAL,
+    TEMP_SOURCE_HA_SENSOR,
+    TEMP_SOURCE_INTERNAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,11 +45,11 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
     data is HeaterStatus | None.
     None means "no response received" — entities mark themselves unavailable.
 
-    Mutable attributes (reg_source, target_temp, power_level, fan_level) are set
-    by the select/number/climate entities when the user changes them. The coordinator
-    uses them to:
+    Mutable attributes are set by climate/select/number entities when the user
+    changes them. The coordinator uses them to:
       - build correct START/SETTINGS frames
-      - inject panel temperature in the 1 Hz loop when reg_source == "panel"
+      - inject the selected temperature source value as panel temp at every poll
+        when heating_preset == PRESET_BY_TEMP
     """
 
     def __init__(
@@ -67,8 +68,9 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
         self.client = client
         self._entry = entry
 
-        # ── Mutable heater state (updated by entities + settings reads) ───────
-        self.reg_source: str = REG_SOURCE_POWER          # default until settings read
+        # ── Mutable heater state (updated by entities + first settings read) ─
+        self.heating_preset: str = PRESET_BY_POWER    # initialised from first settings read
+        self.temp_source: str = TEMP_SOURCE_HA_SENSOR  # HA-side only; never written to heater
         self.target_temp: float = 20.0
         self.power_level: int = DEFAULT_POWER_LEVEL
         self.fan_level: int = DEFAULT_FAN_LEVEL
@@ -76,7 +78,8 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
         # ── Internal bookkeeping ──────────────────────────────────────────────
         self._settings: SettingsPayload | None = None
         self._last_settings_poll: float = 0.0          # monotonic
-        self._panel_fallback_active: bool = False
+        # Prevents periodic settings polls from overwriting a user-selected pending preset
+        self._initial_settings_applied: bool = False
         self._consecutive_poll_failures: int = 0
 
         # ── Fuel-prime state ──────────────────────────────────────────────────
@@ -97,27 +100,30 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
 
     def _apply_settings(self, settings: SettingsPayload) -> None:
         self._settings = settings
-        self.reg_source = MODE_TO_REG_SOURCE.get(settings.mode, REG_SOURCE_POWER)
-        # In power mode the heater doesn't regulate by temperature, so don't let
-        # the settings read overwrite a user-configured target_temp.
-        if self.reg_source != REG_SOURCE_POWER:
-            self.target_temp = max(CLIMATE_TEMP_MIN, min(CLIMATE_TEMP_MAX, float(settings.setpoint)))
+        if not self._initial_settings_applied:
+            # First read only — initialise heating_preset from heater's stored mode.
+            # After this, heating_preset is user-controlled; periodic polls must not
+            # overwrite a pending user selection that hasn't been confirmed by a START yet.
+            self.heating_preset = (
+                PRESET_BY_POWER if settings.mode == START_MODE_BY_POWER else PRESET_BY_TEMP
+            )
+            self._initial_settings_applied = True
+        # target_temp and power_level are always safe to sync from heater
+        if self.heating_preset != PRESET_BY_POWER:
+            self.target_temp = max(
+                CLIMATE_TEMP_MIN, min(CLIMATE_TEMP_MAX, float(settings.setpoint))
+            )
         self.power_level = max(1, min(9, settings.power_level))
 
     # ── DataUpdateCoordinator override ───────────────────────────────────────
 
-    # How many consecutive missed STATUS responses before declaring unavailable.
-    # A command (START/STOP) holds the lock for ~1 s and the heater may not reply
-    # to the immediate post-command refresh poll — tolerate a few misses so that
-    # entities don't flicker unavailable on every command.
     _MAX_POLL_FAILURES = 3
 
     async def _async_update_data(self) -> HeaterStatus | None:
         if not await self.client.ensure_connected():
             raise UpdateFailed("Cannot connect to heater serial port")
 
-        # Inject panel temperature before polling status (panel is the master)
-        if self.reg_source == REG_SOURCE_PANEL:
+        if self.heating_preset == PRESET_BY_TEMP:
             await self._maybe_inject_panel_temp()
 
         try:
@@ -137,11 +143,10 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
                 self._consecutive_poll_failures,
                 self._MAX_POLL_FAILURES,
             )
-            return self.data  # return last known data; entities stay available
+            return self.data
 
         self._consecutive_poll_failures = 0
 
-        # Periodic settings re-read to stay in sync with heater-side changes
         if time.monotonic() - self._last_settings_poll > SETTINGS_READ_INTERVAL:
             with contextlib.suppress(Exception):
                 await self.async_refresh_settings()
@@ -152,68 +157,63 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
 
     async def _maybe_inject_panel_temp(self) -> None:
         """
-        Feed the current HA sensor reading to the heater as the panel temperature.
+        Feed the selected temperature source to the heater as the panel temperature.
 
-        If the source sensor is unavailable or stale, fall back to internal sensor
-        (mode=0x01) and log a warning. Restores panel mode when sensor recovers.
+        Only sends 0x11 SET_TEMP — never 0x02 WRITE_SETTINGS (that's for user actions only).
+        Falls back to the heater's own internal sensor if the configured source is unavailable.
         """
-        source_entity: str | None = self._entry.options.get(CONF_TEMP_SOURCE_ENTITY)
-        if not source_entity:
-            return
+        temp = self._get_source_temp()
+        if temp is None:
+            st = self.data
+            if st is not None:
+                temp = st.heater_temp
+                _LOGGER.debug(
+                    "Temp source '%s' unavailable — feeding heater internal %d°C",
+                    self.temp_source,
+                    temp,
+                )
+        if temp is not None:
+            await self.client.send_set_temp(max(PANEL_TEMP_MIN, min(PANEL_TEMP_MAX, temp)))
 
-        state = self.hass.states.get(source_entity)
-        if state is None or state.state in ("unknown", "unavailable"):
-            await self._handle_panel_sensor_unavailable(source_entity, "state is unavailable")
-            return
+    def _get_source_temp(self) -> int | None:
+        """Return the current value of the selected temperature source, or None if unavailable."""
+        st = self.data
+        if self.temp_source == TEMP_SOURCE_INTERNAL:
+            return st.heater_temp if st else None
 
-        threshold: int = int(
-            self._entry.options.get(CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD)
-        )
-        age = (dt_util.utcnow() - state.last_changed).total_seconds()
-        if age > threshold:
-            await self._handle_panel_sensor_unavailable(
-                source_entity, f"stale ({age:.0f} s > threshold {threshold} s)"
+        if self.temp_source == TEMP_SOURCE_EXTERNAL:
+            # Note: codec decodes ext_temp as uint8. Sub-zero readings will be
+            # misrepresented until signed int8 decoding is added to codec.py.
+            return (st.ext_temp if (st and st.ext_temp is not None) else None)
+
+        if self.temp_source == TEMP_SOURCE_HA_SENSOR:
+            source_entity: str | None = self._entry.options.get(CONF_TEMP_SOURCE_ENTITY)
+            if not source_entity:
+                return None
+            state = self.hass.states.get(source_entity)
+            if state is None or state.state in ("unknown", "unavailable"):
+                return None
+            threshold: int = int(
+                self._entry.options.get(CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD)
             )
-            return
+            if (dt_util.utcnow() - state.last_changed).total_seconds() > threshold:
+                return None
+            try:
+                return int(round(float(state.state)))
+            except ValueError:
+                return None
 
-        try:
-            raw = float(state.state)
-        except ValueError:
-            await self._handle_panel_sensor_unavailable(
-                source_entity, f"non-numeric state '{state.state}'"
-            )
-            return
+        return None
 
-        temp = int(round(max(PANEL_TEMP_MIN, min(PANEL_TEMP_MAX, raw))))
+    def get_displayed_temp(self) -> float | None:
+        """
+        Return the temperature shown on the climate card and fed to the heater.
 
-        if self._panel_fallback_active:
-            _LOGGER.info(
-                "Panel temp source %s recovered (%.1f°C), resuming panel mode",
-                source_entity,
-                raw,
-            )
-            self._panel_fallback_active = False
-            # Restore panel mode in heater settings
-            await self.client.send_write_settings(
-                mode=REG_SOURCE_TO_MODE[REG_SOURCE_PANEL],
-                setpoint=int(round(self.target_temp)),
-                ventilation=0,
-                power_level=self.power_level,
-            )
-
-        await self.client.send_set_temp(temp)
-
-    async def _handle_panel_sensor_unavailable(self, entity_id: str, reason: str) -> None:
-        if not self._panel_fallback_active:
-            _LOGGER.warning(
-                "Panel temp source %s %s — falling back to internal sensor",
-                entity_id,
-                reason,
-            )
-            self._panel_fallback_active = True
-            await self.client.send_write_settings(
-                mode=START_MODE_BY_HEATER_TEMP,
-                setpoint=int(round(self.target_temp)),
-                ventilation=0,
-                power_level=self.power_level,
-            )
+        When the configured source is unavailable, returns the heater's internal sensor
+        reading as fallback — never returns None while the heater is online.
+        """
+        raw = self._get_source_temp()
+        if raw is not None:
+            return float(raw)
+        st = self.data
+        return float(st.heater_temp) if st else None
