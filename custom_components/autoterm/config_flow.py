@@ -29,12 +29,10 @@ from .const import (
     CONF_BAUD_RATE,
     CONF_POLL_INTERVAL,
     CONF_PORT,
-    CONF_STALENESS_THRESHOLD,
     CONF_TEMP_SOURCE_ENTITY,
     DEFAULT_BAUD,
     DEFAULT_NAME,
     DEFAULT_POLL_INTERVAL,
-    DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
     HINT_PORT,
 )
@@ -162,7 +160,6 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             options: dict = {
                 CONF_BAUD_RATE: user_input[CONF_BAUD_RATE],
                 CONF_POLL_INTERVAL: user_input[CONF_POLL_INTERVAL],
-                CONF_STALENESS_THRESHOLD: user_input[CONF_STALENESS_THRESHOLD],
             }
             if user_input.get(CONF_TEMP_SOURCE_ENTITY):
                 options[CONF_TEMP_SOURCE_ENTITY] = user_input[CONF_TEMP_SOURCE_ENTITY]
@@ -187,11 +184,6 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Optional(CONF_TEMP_SOURCE_ENTITY): EntitySelector(
                     EntitySelectorConfig(domain="sensor")
                 ),
-                vol.Optional(
-                    CONF_STALENESS_THRESHOLD, default=DEFAULT_STALENESS_THRESHOLD
-                ): NumberSelector(
-                    NumberSelectorConfig(min=30, max=600, step=10, mode=NumberSelectorMode.SLIDER)
-                ),
             }
         )
         return self.async_show_form(step_id="settings", data_schema=schema)
@@ -205,7 +197,7 @@ class AutotermConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 
 class AutotermOptionsFlow(config_entries.OptionsFlow):
-    """Allow baud rate, poll interval, source entity and staleness threshold to be changed."""
+    """Allow baud rate, poll interval, and source entity to be changed."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         self._config_entry = config_entry
@@ -239,11 +231,5 @@ class AutotermOptionsFlow(config_entries.OptionsFlow):
                 CONF_TEMP_SOURCE_ENTITY,
                 description={"suggested_value": current_source},
             ): EntitySelector(EntitySelectorConfig(domain="sensor")),
-            vol.Optional(
-                CONF_STALENESS_THRESHOLD,
-                default=opts.get(CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD),
-            ): NumberSelector(
-                NumberSelectorConfig(min=30, max=600, step=10, mode=NumberSelectorMode.SLIDER)
-            ),
         }
         return self.async_show_form(step_id="init", data_schema=vol.Schema(schema_dict))

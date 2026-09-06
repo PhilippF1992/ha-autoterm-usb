@@ -15,7 +15,6 @@ Run with:  pytest custom_components/autoterm/tests/
 from __future__ import annotations
 
 import asyncio
-import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 from custom_components.autoterm.const import (
@@ -62,22 +61,15 @@ def _make_coordinator(
     temp_source: str = TEMP_SOURCE_INTERNAL,
     status: MagicMock | None = None,
     source_entity: str | None = None,
-    staleness_threshold: int = 120,
 ) -> AutotermCoordinator:
     hass = MagicMock()
     client = MagicMock()
     entry = MagicMock()
     entry.options = {}
     if source_entity:
-        entry.options[TEMP_SOURCE_HA_SENSOR] = source_entity  # not used directly
-        # The coordinator reads CONF_TEMP_SOURCE_ENTITY from options
-        from custom_components.autoterm.const import (
-            CONF_STALENESS_THRESHOLD,
-            CONF_TEMP_SOURCE_ENTITY,
-        )
+        from custom_components.autoterm.const import CONF_TEMP_SOURCE_ENTITY
 
         entry.options[CONF_TEMP_SOURCE_ENTITY] = source_entity
-        entry.options[CONF_STALENESS_THRESHOLD] = staleness_threshold
 
     coord = AutotermCoordinator.__new__(AutotermCoordinator)
     coord.hass = hass
@@ -287,27 +279,8 @@ def test_get_source_temp_ha_sensor_valid(monkeypatch):
     )
     sensor_state = MagicMock()
     sensor_state.state = "19.5"
-    sensor_state.last_changed = datetime.datetime.now(datetime.UTC)
     coord.hass.states.get.return_value = sensor_state
     assert coord._get_source_temp() == 20  # round(19.5) == 20
-
-
-def test_get_source_temp_ha_sensor_stale_returns_none(monkeypatch):
-    st = _make_status(heater_temp=18)
-    coord = _make_coordinator(
-        temp_source=TEMP_SOURCE_HA_SENSOR,
-        status=st,
-        source_entity="sensor.room_temp",
-        staleness_threshold=120,
-    )
-    sensor_state = MagicMock()
-    sensor_state.state = "19.0"
-    # Last changed 200 seconds ago — stale
-    sensor_state.last_changed = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
-        seconds=200
-    )
-    coord.hass.states.get.return_value = sensor_state
-    assert coord._get_source_temp() is None
 
 
 def test_get_source_temp_ha_sensor_unavailable_returns_none():
@@ -345,26 +318,6 @@ def test_get_displayed_temp_external_returns_ext_temp():
     st = _make_status(ext_temp=5, heater_temp=22)
     coord = _make_coordinator(temp_source=TEMP_SOURCE_EXTERNAL, status=st)
     assert coord.get_displayed_temp() == 5.0
-
-
-def test_get_displayed_temp_stale_ha_sensor_returns_heater_fallback():
-    st = _make_status(heater_temp=18)
-    coord = _make_coordinator(
-        temp_source=TEMP_SOURCE_HA_SENSOR,
-        status=st,
-        source_entity="sensor.room_temp",
-        staleness_threshold=120,
-    )
-    sensor_state = MagicMock()
-    sensor_state.state = "19.0"
-    sensor_state.last_changed = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
-        seconds=200
-    )
-    coord.hass.states.get.return_value = sensor_state
-    # Stale → source returns None → fallback to heater_temp=18
-    result = coord.get_displayed_temp()
-    assert result == 18.0
-    assert result is not None  # never blank
 
 
 def test_get_displayed_temp_unavailable_ha_sensor_returns_heater_fallback():
@@ -410,7 +363,7 @@ def test_climate_current_temperature_by_power_uses_heater_temp():
     assert ent.current_temperature == 25.0
 
 
-def test_climate_current_temperature_stale_source_shows_fallback_not_none():
+def test_climate_current_temperature_unavailable_source_shows_fallback_not_none():
     from custom_components.autoterm.climate import AutotermClimate
 
     st = _make_status(heater_temp=18)
@@ -419,13 +372,9 @@ def test_climate_current_temperature_stale_source_shows_fallback_not_none():
         temp_source=TEMP_SOURCE_HA_SENSOR,
         status=st,
         source_entity="sensor.room_temp",
-        staleness_threshold=120,
     )
     sensor_state = MagicMock()
-    sensor_state.state = "22.0"
-    sensor_state.last_changed = datetime.datetime.now(datetime.UTC) - datetime.timedelta(
-        seconds=300
-    )
+    sensor_state.state = "unavailable"
     coord.hass.states.get.return_value = sensor_state
     ent = AutotermClimate.__new__(AutotermClimate)
     ent.coordinator = coord

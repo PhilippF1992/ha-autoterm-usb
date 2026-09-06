@@ -11,18 +11,15 @@ from datetime import timedelta
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.util import dt as dt_util
 
 from .client import AutotermClient, AutotermClientError
 from .codec import HeaterStatus, SettingsPayload
 from .const import (
     CLIMATE_TEMP_MAX,
     CLIMATE_TEMP_MIN,
-    CONF_STALENESS_THRESHOLD,
     CONF_TEMP_SOURCE_ENTITY,
     DEFAULT_FAN_LEVEL,
     DEFAULT_POWER_LEVEL,
-    DEFAULT_STALENESS_THRESHOLD,
     DOMAIN,
     PANEL_TEMP_MAX,
     PANEL_TEMP_MIN,
@@ -207,19 +204,6 @@ class AutotermCoordinator(DataUpdateCoordinator[HeaterStatus | None]):
                     "Temperature sensor '%s' is %s — falling back to internal sensor",
                     source_entity,
                     state.state,
-                )
-                return None
-            threshold: int = int(
-                self._entry.options.get(CONF_STALENESS_THRESHOLD, DEFAULT_STALENESS_THRESHOLD)
-            )
-            age = (dt_util.utcnow() - state.last_changed).total_seconds()
-            if age > threshold:
-                _LOGGER.warning(
-                    "Temperature sensor '%s' last updated %.0f s ago (threshold %d s) — "
-                    "falling back to internal sensor",
-                    source_entity,
-                    age,
-                    threshold,
                 )
                 return None
             try:

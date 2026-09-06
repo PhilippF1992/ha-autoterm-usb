@@ -21,12 +21,10 @@
           "name": "Name",
           "baud_rate": "Baud rate (confirmed: 2400)",
           "poll_interval": "Poll interval (seconds)",
-          "temp_source_entity": "Room temperature sensor (optional)",
-          "staleness_threshold": "Sensor staleness threshold (seconds)"
+          "temp_source_entity": "Room temperature sensor (optional)"
         },
         "data_description": {
-          "temp_source_entity": "HA sensor entity (e.g. DS18B20) used as the current room temperature. Required for 'Panel (HA-fed)' regulation mode. Can be set or changed later in Options.",
-          "staleness_threshold": "If the sensor has not updated in this many seconds it is treated as stale and the integration falls back to the heater's internal sensor."
+          "temp_source_entity": "HA sensor entity (e.g. DS18B20) used as the current room temperature. Fed to the heater as panel temp when Temperature Source is set to 'ha_sensor'. Can be set or changed later in Options."
         }
       }
     },
@@ -45,12 +43,10 @@
         "data": {
           "baud_rate": "Baud rate",
           "poll_interval": "Poll interval (seconds)",
-          "temp_source_entity": "Room temperature sensor (for Panel mode)",
-          "staleness_threshold": "Sensor staleness threshold (seconds)"
+          "temp_source_entity": "Room temperature sensor"
         },
         "data_description": {
-          "temp_source_entity": "HA sensor entity (e.g. DS18B20) whose value is fed to the heater every poll cycle when regulation mode is 'Panel (HA-fed)'. If unavailable or stale the integration falls back to the internal sensor.",
-          "staleness_threshold": "If the selected sensor has not updated in this many seconds it is treated as stale and the integration falls back to the internal heater sensor."
+          "temp_source_entity": "HA sensor entity whose value is fed to the heater every poll cycle when Temperature Source is set to 'ha_sensor'. Falls back to the internal sensor if unavailable."
         }
       }
     }

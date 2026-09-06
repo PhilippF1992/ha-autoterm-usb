@@ -34,18 +34,7 @@ _stub(
 _stub("homeassistant.core", HomeAssistant=object, callback=lambda f: f, ServiceCall=object)
 _stub("homeassistant.exceptions", ConfigEntryNotReady=Exception, HomeAssistantError=Exception)
 
-# ── homeassistant.util.dt stub (used by coordinator for staleness checks) ─────
 _stub("homeassistant.util")
-import datetime as _datetime
-
-
-class _FakeDtUtil:
-    @staticmethod
-    def utcnow():
-        return _datetime.datetime.now(_datetime.UTC)
-
-
-_stub("homeassistant.util.dt", utcnow=_FakeDtUtil.utcnow)
 
 
 # Generic base classes that support subscript (Coordinator[T] etc.)
@@ -166,12 +155,10 @@ _stub(
     DEFAULT_NAME="Autoterm Air 4D",
     DEFAULT_POWER_LEVEL=5,
     DEFAULT_FAN_LEVEL=5,
-    DEFAULT_STALENESS_THRESHOLD=120,
     CONF_PORT="port",
     CONF_BAUD_RATE="baud_rate",
     CONF_POLL_INTERVAL="poll_interval",
     CONF_TEMP_SOURCE_ENTITY="temp_source_entity",
-    CONF_STALENESS_THRESHOLD="staleness_threshold",
     HINT_PORT="/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_ABAKLQ9A-if00-port0",
     POWER_LEVEL_MIN=1,
     POWER_LEVEL_MAX=9,

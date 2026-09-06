@@ -10,7 +10,6 @@ CONF_PORT = "port"
 CONF_BAUD_RATE = "baud_rate"
 CONF_POLL_INTERVAL = "poll_interval"
 CONF_TEMP_SOURCE_ENTITY = "temp_source_entity"
-CONF_STALENESS_THRESHOLD = "staleness_threshold"
 
 # ── Defaults ─────────────────────────────────────────────────────────────────
 
@@ -19,7 +18,6 @@ DEFAULT_POLL_INTERVAL = 5  # seconds
 DEFAULT_NAME = "Autoterm USB"
 DEFAULT_POWER_LEVEL = 5
 DEFAULT_FAN_LEVEL = 5
-DEFAULT_STALENESS_THRESHOLD = 120  # seconds before panel sensor feed is considered stale
 
 # Stable by-id path hint shown as default in config flow
 HINT_PORT = "/dev/serial/by-id/usb-FTDI_FT232R_USB_UART_ABAKLQ9A-if00-port0"
