@@ -165,7 +165,7 @@ def test_fan_level_unavailable_when_heating():
     assert ent.available is False
 
 
-def test_temp_source_available_only_in_by_temp():
+def test_temp_source_available_in_by_temp():
     from custom_components.autoterm.select import AutotermTempSourceSelect
 
     coord = _make_coordinator(heating_preset=PRESET_BY_TEMP)
@@ -175,14 +175,15 @@ def test_temp_source_available_only_in_by_temp():
     assert ent.available is True
 
 
-def test_temp_source_unavailable_in_by_power():
+def test_temp_source_available_in_by_power():
+    # Source select is always available so the user can control what the card displays
     from custom_components.autoterm.select import AutotermTempSourceSelect
 
     coord = _make_coordinator(heating_preset=PRESET_BY_POWER)
     coord.last_update_success = True
     ent = AutotermTempSourceSelect.__new__(AutotermTempSourceSelect)
     ent.coordinator = coord
-    assert ent.available is False
+    assert ent.available is True
 
 
 def test_target_temp_in_supported_features_when_by_temp():

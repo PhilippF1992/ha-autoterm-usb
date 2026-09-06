@@ -127,18 +127,8 @@ class AutotermClimate(CoordinatorEntity[AutotermCoordinator], ClimateEntity):
 
     @property
     def current_temperature(self) -> float | None:
-        """
-        Return the current temperature.
-
-        In "By Temperature" preset, returns the same value being fed to the heater
-        as panel temp — so the card always shows what's actually driving regulation.
-        Falls back to heater internal sensor when the configured source is unavailable.
-        In other modes, returns the heater's internal sensor reading directly.
-        """
-        if self.coordinator.heating_preset == PRESET_BY_TEMP:
-            return self.coordinator.get_displayed_temp()
-        st = self.coordinator.data
-        return float(st.heater_temp) if st else None
+        """Return the current temperature from the selected source in all modes."""
+        return self.coordinator.get_displayed_temp()
 
     @property
     def available(self) -> bool:

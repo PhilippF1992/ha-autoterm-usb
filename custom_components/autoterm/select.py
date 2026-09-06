@@ -13,7 +13,6 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import (
     DOMAIN,
-    PRESET_BY_TEMP,
     TEMP_SOURCE_EXTERNAL,
     TEMP_SOURCE_HA_SENSOR,
     TEMP_SOURCE_INTERNAL,
@@ -71,10 +70,7 @@ class AutotermTempSourceSelect(CoordinatorEntity[AutotermCoordinator], SelectEnt
 
     @property
     def available(self) -> bool:
-        return (
-            self.coordinator.last_update_success
-            and self.coordinator.heating_preset == PRESET_BY_TEMP
-        )
+        return self.coordinator.last_update_success
 
     @property
     def current_option(self) -> str:
